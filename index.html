@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Re:GLOW FITNESS 予約</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #f0f0f0; color: #111; max-width: 480px; margin: 0 auto; min-height: 100vh; }
+
+    /* ========== ヘッダー ========== */
+    .header { background: #06C755; padding: 14px 16px 12px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 100; }
+    .header-back { color: white; font-size: 22px; cursor: pointer; width: 28px; text-align: center; }
+    .header-title { color: white; font-size: 16px; font-weight: 600; flex: 1; }
+
+    /* ========== スクリーン ========== */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ========== ホーム ========== */
+    .home-greeting { background: white; margin: 12px; border-radius: 14px; padding: 18px; }
+    .home-name { font-size: 16px; font-weight: 600; color: #111; }
+    .home-sub { font-size: 13px; color: #888; margin-top: 2px; }
+    .ticket-block { margin-top: 14px; background: #f7f7f7; border-radius: 12px; padding: 14px; }
+    .ticket-type-label { font-size: 11px; color: #06C755; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.04em; }
+    .ticket-count-row { display: flex; align-items: baseline; gap: 4px; }
+    .ticket-big { font-size: 36px; font-weight: 600; color: #111; line-height: 1; }
+    .ticket-unit { font-size: 14px; color: #888; }
+    .ticket-bar-bg { margin-top: 10px; background: #e0e0e0; border-radius: 99px; height: 5px; overflow: hidden; }
+    .ticket-bar-fill { height: 100%; border-radius: 99px; background: #06C755; transition: width 0.4s; }
+    .ticket-exp { font-size: 11px; color: #aaa; margin-top: 6px; }
+    .no-ticket { color: #aaa; font-size: 13px; text-align: center; padding: 12px 0; }
+
+    .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 12px 12px; }
+    .menu-btn { background: white; border-radius: 14px; padding: 16px 12px; text-align: center; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
+    .menu-btn:active { transform: scale(0.97); }
+    .menu-btn.primary { border-color: #06C755; }
+    .menu-btn-icon { font-size: 24px; margin-bottom: 6px; }
+    .menu-btn-label { font-size: 13px; font-weight: 600; color: #111; }
+    .menu-btn-sub { font-size: 11px; color: #aaa; margin-top: 2px; }
+
+    .section-label { padding: 6px 16px 4px; font-size: 11px; color: #aaa; font-weight: 600; letter-spacing: 0.04em; }
+    .history-item { background: white; margin: 0 12px 8px; border-radius: 12px; padding: 12px 14px; }
+    .history-date { font-size: 11px; color: #aaa; }
+    .history-title { font-size: 13px; font-weight: 600; color: #111; margin-top: 2px; }
+    .history-badge { display: inline-block; margin-top: 4px; font-size: 10px; background: #e8f9ef; color: #06C755; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+
+    /* ========== カレンダー ========== */
+    .cal-nav { display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 16px 8px; }
+    .cal-month { font-size: 15px; font-weight: 600; color: #111; }
+    .cal-nav-btn { width: 28px; height: 28px; border-radius: 99px; background: #f0f0f0; border: none; font-size: 14px; cursor: pointer; color: #555; display: flex; align-items: center; justify-content: center; }
+    .cal-days-header { display: grid; grid-template-columns: repeat(7, 1fr); background: white; padding: 0 8px 4px; }
+    .cal-day-name { text-align: center; font-size: 11px; color: #aaa; padding: 3px 0; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: white; padding: 0 8px 12px; gap: 2px; }
+    .cal-cell { text-align: center; padding: 5px 2px; font-size: 14px; color: #333; cursor: pointer; border-radius: 99px; position: relative; line-height: 1.6; }
+    .cal-cell.other { color: #ccc; pointer-events: none; }
+    .cal-cell.past { color: #ddd; pointer-events: none; }
+    .cal-cell.today { color: #06C755; font-weight: 600; }
+    .cal-cell.selected { background: #06C755; color: white; font-weight: 600; }
+    .cal-cell.has-slot::after { content: ''; display: block; width: 4px; height: 4px; background: #06C755; border-radius: 50%; margin: 1px auto 0; }
+    .cal-cell.selected::after { background: rgba(255,255,255,0.7); }
+
+    .time-section { background: white; margin-top: 8px; padding: 14px 16px; }
+    .time-title { font-size: 12px; color: #aaa; margin-bottom: 10px; font-weight: 600; }
+    .time-slots { display: flex; flex-wrap: wrap; gap: 8px; }
+    .time-slot { padding: 8px 14px; border-radius: 99px; border: 1.5px solid #e0e0e0; font-size: 13px; color: #333; cursor: pointer; transition: all 0.15s; }
+    .time-slot:active { transform: scale(0.96); }
+    .time-slot.selected { background: #06C755; border-color: #06C755; color: white; font-weight: 600; }
+    .time-slot.full { background: #f5f5f5; color: #ccc; border-color: #eee; cursor: default; text-decoration: line-through; }
+    .time-slot.no-slots { color: #aaa; font-size: 13px; border: none; padding: 4px 0; }
+
+    /* ========== 確認画面 ========== */
+    .confirm-card { background: white; margin: 12px; border-radius: 14px; overflow: hidden; }
+    .confirm-card-title { padding: 14px 16px 0; font-size: 14px; font-weight: 600; color: #111; }
+    .confirm-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 16px; border-bottom: 1px solid #f5f5f5; }
+    .confirm-row:last-child { border-bottom: none; }
+    .confirm-key { font-size: 13px; color: #888; }
+    .confirm-val { font-size: 13px; color: #111; font-weight: 600; }
+    .confirm-warn { margin: 0 12px 12px; background: #fff8e1; border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #8a6000; line-height: 1.6; }
+
+    /* ========== 完了画面 ========== */
+    .done-wrap { display: flex; flex-direction: column; align-items: center; padding: 36px 20px 20px; }
+    .done-circle { width: 64px; height: 64px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+    .done-title { font-size: 18px; font-weight: 600; color: #111; margin-bottom: 6px; }
+    .done-sub { font-size: 13px; color: #888; text-align: center; line-height: 1.7; }
+    .done-card { background: white; margin: 16px 12px 0; border-radius: 14px; padding: 14px 16px; }
+    .done-row { display: flex; justify-content: space-between; padding: 6px 0; }
+    .done-key { font-size: 13px; color: #888; }
+    .done-val { font-size: 13px; color: #111; font-weight: 600; }
+    .line-msg { background: #e8f9ef; margin: 12px 12px 0; border-radius: 12px; padding: 12px 14px; }
+    .line-msg-label { font-size: 10px; color: #06C755; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.04em; }
+    .line-msg-text { font-size: 13px; color: #333; line-height: 1.7; }
+
+    /* ========== ボタン ========== */
+    .cta-btn { display: block; margin: 12px 12px 0; background: #06C755; color: white; border: none; border-radius: 14px; padding: 15px; font-size: 15px; font-weight: 600; width: calc(100% - 24px); cursor: pointer; text-align: center; transition: all 0.15s; }
+    .cta-btn:active { transform: scale(0.98); opacity: 0.9; }
+    .cta-btn.outline { background: white; color: #06C755; border: 2px solid #06C755; margin-top: 8px; }
+    .cta-btn:disabled { background: #ccc; cursor: default; }
+
+    /* ========== ローディング ========== */
+    .loading { text-align: center; padding: 40px 20px; color: #aaa; font-size: 14px; }
+    .loading-spinner { width: 32px; height: 32px; border: 3px solid #e0e0e0; border-top-color: #06C755; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ========== エラー ========== */
+    .error-box { background: #ffeaea; border-radius: 10px; padding: 14px; margin: 12px; font-size: 13px; color: #c0392b; line-height: 1.6; }
+
+    .pb { padding-bottom: 24px; }
+  </style>
+</head>
+<body>
+
+<!-- ========== ヘッダー ========== -->
+<div class="header">
+  <div class="header-back" id="header-back" onclick="goBack()" style="visibility:hidden;">‹</div>
+  <div class="header-title" id="header-title">Re:GLOW FITNESS</div>
+</div>
+
+<!-- ========== ホーム画面 ========== -->
+<div class="screen active" id="screen-home">
+  <div class="loading" id="home-loading">
+    <div class="loading-spinner"></div>
+    読み込み中...
+  </div>
+  <div id="home-content" style="display:none;">
+    <div class="home-greeting">
+      <div class="home-name" id="user-name">Loading...</div>
+      <div class="home-sub">いつもありがとうございます</div>
+      <div id="ticket-area"></div>
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="menu-grid">
+      <div class="menu-btn primary" onclick="goScreen('screen-calendar')">
+        <div class="menu-btn-icon">📅</div>
+        <div class="menu-btn-label">予約する</div>
+        <div class="menu-btn-sub">日時を選択</div>
+      </div>
+      <div class="menu-btn" onclick="goScreen('screen-my-bookings')">
+        <div class="menu-btn-icon">🗓</div>
+        <div class="menu-btn-label">予約確認</div>
+        <div class="menu-btn-sub" id="next-booking-sub">次回の予約</div>
+      </div>
+      <div class="menu-btn" onclick="goScreen('screen-history')">
+        <div class="menu-btn-icon">📋</div>
+        <div class="menu-btn-label">履歴</div>
+        <div class="menu-btn-sub">過去の来店</div>
+      </div>
+      <div class="menu-btn" onclick="goScreen('screen-ticket')">
+        <div class="menu-btn-icon">🎫</div>
+        <div class="menu-btn-label">チケット</div>
+        <div class="menu-btn-sub">残数確認</div>
+      </div>
+    </div>
+
+    <div class="section-label">最近の来店</div>
+    <div id="recent-history"></div>
+    <div class="pb"></div>
+  </div>
+</div>
+
+<!-- ========== カレンダー（日時選択）========== -->
+<div class="screen" id="screen-calendar">
+  <div class="cal-nav">
+    <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
+    <div class="cal-month" id="cal-month-label"></div>
+    <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
+  </div>
+  <div class="cal-days-header">
+    <div class="cal-day-name" style="color:#e06060;">日</div>
+    <div class="cal-day-name">月</div><div class="cal-day-name">火</div>
+    <div class="cal-day-name">水</div><div class="cal-day-name">木</div>
+    <div class="cal-day-name">金</div>
+    <div class="cal-day-name" style="color:#6090e0;">土</div>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="time-section" id="time-section" style="display:none;">
+    <div class="time-title" id="time-section-title">空き時間</div>
+    <div class="time-slots" id="time-slots"></div>
+  </div>
+  <button class="cta-btn" id="cal-next-btn" style="display:none;" onclick="goScreen('screen-confirm')">この日時で確認する</button>
+  <div class="pb"></div>
+</div>
+
+<!-- ========== 予約確認画面 ========== -->
+<div class="screen" id="screen-confirm">
+  <div class="confirm-card">
+    <div class="confirm-card-title">予約内容</div>
+    <div class="confirm-row"><span class="confirm-key">日時</span><span class="confirm-val" id="confirm-datetime">—</span></div>
+    <div class="confirm-row"><span class="confirm-key">メニュー</span><span class="confirm-val">セミパーソナル 60分</span></div>
+    <div class="confirm-row"><span class="confirm-key">チケット消化</span><span class="confirm-val" id="confirm-ticket">—</span></div>
+    <div class="confirm-row"><span class="confirm-key">有効期限</span><span class="confirm-val" id="confirm-expiry">—</span></div>
+  </div>
+  <div class="confirm-warn">キャンセルは予約12時間前まで受け付けます</div>
+  <button class="cta-btn" onclick="submitBooking()">予約を確定する</button>
+  <button class="cta-btn outline" onclick="goScreen('screen-calendar')">日時を変更する</button>
+  <div class="pb"></div>
+</div>
+
+<!-- ========== 予約完了画面 ========== -->
+<div class="screen" id="screen-done">
+  <div class="done-wrap">
+    <div class="done-circle">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M6 16l8 8 12-12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="done-title">予約が完了しました</div>
+    <div class="done-sub">LINEに確認メッセージを<br>お送りしました</div>
+  </div>
+  <div class="done-card">
+    <div class="done-row"><span class="done-key">日時</span><span class="done-val" id="done-datetime">—</span></div>
+    <div class="done-row"><span class="done-key">残り回数</span><span class="done-val" id="done-remaining">—</span></div>
+  </div>
+  <div class="line-msg">
+    <div class="line-msg-label">LINEメッセージ</div>
+    <div class="line-msg-text" id="done-line-msg">—</div>
+  </div>
+  <button class="cta-btn" style="margin-top:16px;" onclick="goHome()">ホームに戻る</button>
+  <div class="pb"></div>
+</div>
+
+<!-- ========== 予約一覧 ========== -->
+<div class="screen" id="screen-my-bookings">
+  <div id="my-bookings-content"><div class="loading"><div class="loading-spinner"></div>読み込み中...</div></div>
+  <div class="pb"></div>
+</div>
+
+<!-- ========== 来店履歴 ========== -->
+<div class="screen" id="screen-history">
+  <div id="history-content"><div class="loading"><div class="loading-spinner"></div>読み込み中...</div></div>
+  <div class="pb"></div>
+</div>
+
+<!-- ========== チケット詳細 ========== -->
+<div class="screen" id="screen-ticket">
+  <div id="ticket-detail-content"><div class="loading"><div class="loading-spinner"></div>読み込み中...</div></div>
+  <div class="pb"></div>
+</div>
+
+<script>
+// ========== 設定 ==========
+const SUPABASE_URL = 'https://plapbyvgthymszrzbsgl.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYXBieXZndGh5bXN6cnpic2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3ODEwOTQsImV4cCI6MjA1ODM1NzA5NH0.YMSOwuQclwVWLQxMdZqCeHX-22oeMYxy0GmygTakeUw';
+const LIFF_ID = '2009580897-CDVPk98y';
+
+// ========== 状態管理 ==========
+let sbClient = null;
+let lineProfile = null;
+let currentCustomer = null;
+let currentTicket = null;
+let selectedDate = null;
+let selectedTime = null;
+let calYear, calMonth;
+let screenHistory = [];
+
+// ========== 初期化 ==========
+async function init() {
+  sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (liff.isLoggedIn()) {
+      lineProfile = await liff.getProfile();
+    } else {
+      liff.login();
+      return;
+    }
+  } catch(e) {
+    lineProfile = { userId: 'test_user', displayName: 'テストユーザー' };
+  }
+
+  await loadCustomer();
+}
+
+// ========== 顧客データ読み込み ==========
+async function loadCustomer() {
+  const { data: customers } = await sbClient
+    .from('customers')
+    .select('*, tickets(*)')
+    .eq('line_user_id', lineProfile.userId);
+
+  if (customers && customers.length > 0) {
+    currentCustomer = customers[0];
+    currentTicket = currentCustomer.tickets?.[0] || null;
+  } else {
+    const { data: newCustomer } = await sbClient
+      .from('customers')
+      .insert({ name: lineProfile.displayName, line_user_id: lineProfile.userId })
+      .select('*, tickets(*)')
+      .single();
+    currentCustomer = newCustomer;
+    currentTicket = null;
+  }
+
+  renderHome();
+}
+
+// ========== ホーム描画 ==========
+function renderHome() {
+  document.getElementById('home-loading').style.display = 'none';
+  document.getElementById('home-content').style.display = 'block';
+  document.getElementById('user-name').textContent = (currentCustomer?.name || lineProfile?.displayName || '') + ' さん';
+
+  const ticketArea = document.getElementById('ticket-area');
+  if (currentTicket) {
+    const remaining = currentTicket.remaining_count;
+    const total = currentTicket.total_count;
+    const pct = Math.round((remaining / total) * 100);
+    const barColor = pct > 50 ? '#06C755' : pct > 20 ? '#f0a500' : '#e74c3c';
+    ticketArea.innerHTML = `
+      <div class="ticket-block">
+        <div class="ticket-type-label">${currentTicket.plan_type === 'ticket' ? '回数券' : '月額制'}</div>
+        <div class="ticket-count-row">
+          <span class="ticket-big">${remaining}</span>
+          <span class="ticket-unit">回 残り</span>
+        </div>
+        <div class="ticket-bar-bg"><div class="ticket-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+        <div class="ticket-exp">有効期限：${currentTicket.expires_at || '未設定'}</div>
+      </div>`;
+  } else {
+    ticketArea.innerHTML = `<div class="ticket-block"><div class="no-ticket">チケットが設定されていません<br>スタッフにお問い合わせください</div></div>`;
+  }
+
+  loadRecentHistory();
+}
+
+async function loadRecentHistory() {
+  if (!currentCustomer) return;
+  const { data } = await sbClient.from('bookings')
+    .select('*').eq('customer_id', currentCustomer.id)
+    .eq('status', 'completed').order('scheduled_at', { ascending: false }).limit(3);
+  const el = document.getElementById('recent-history');
+  if (!data || data.length === 0) {
+    el.innerHTML = '<div class="history-item"><div class="no-ticket">来店履歴がありません</div></div>';
+    return;
+  }
+  el.innerHTML = data.map(b => {
+    const dt = new Date(b.scheduled_at);
+    return `<div class="history-item">
+      <div class="history-date">${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日（${['日','月','火','水','木','金','土'][dt.getDay()]}）</div>
+      <div class="history-title">セミパーソナル ${b.duration_minutes}分</div>
+      <span class="history-badge">完了</span>
+    </div>`;
+  }).join('');
+}
+
+// ========== カレンダー描画 ==========
+function renderCalendar() {
+  const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  document.getElementById('cal-month-label').textContent = `${calYear}年 ${monthNames[calMonth]}`;
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const prevDays = new Date(calYear, calMonth, 0).getDate();
+
+  const availableDates = getAvailableDates();
+
+  let html = '';
+  for (let i = 0; i < firstDay; i++) {
+    html += `<div class="cal-cell other">${prevDays - firstDay + i + 1}</div>`;
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(calYear, calMonth, d);
+    date.setHours(0,0,0,0);
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = date.getTime() === today.getTime();
+    const isPast = date < today;
+    const isSelected = selectedDate === dateStr;
+    const hasSlot = availableDates.includes(date.getDay()) && !isPast;
+    let cls = 'cal-cell';
+    if (isPast) cls += ' past';
+    else if (isSelected) cls += ' selected';
+    else if (isToday) cls += ' today';
+    if (hasSlot && !isPast) cls += ' has-slot';
+    const click = (!isPast && hasSlot) ? `onclick="selectDate('${dateStr}', ${d})"` : '';
+    html += `<div class="${cls}" ${click}>${d}</div>`;
+  }
+  const remaining = 7 - ((firstDay + daysInMonth) % 7);
+  if (remaining < 7) {
+    for (let i = 1; i <= remaining; i++) html += `<div class="cal-cell other">${i}</div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+function getAvailableDates() {
+  return [1,2,3,4,5,6];
+}
+
+function changeMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  selectedDate = null;
+  selectedTime = null;
+  document.getElementById('time-section').style.display = 'none';
+  document.getElementById('cal-next-btn').style.display = 'none';
+  renderCalendar();
+}
+
+function selectDate(dateStr, day) {
+  selectedDate = dateStr;
+  selectedTime = null;
+  renderCalendar();
+  renderTimeSlots(dateStr);
+}
+
+function renderTimeSlots(dateStr) {
+  const timeSection = document.getElementById('time-section');
+  const d = new Date(dateStr);
+  const dayNames = ['日','月','火','水','木','金','土'];
+  document.getElementById('time-section-title').textContent =
+    `${d.getMonth()+1}月${d.getDate()}日（${dayNames[d.getDay()]}）の空き枠`;
+
+  const slots = ['10:00','11:00','14:00','15:00','16:00','17:00','18:00','19:00'];
+  const fullSlots = [];
+
+  const html = slots.map(t => {
+    if (fullSlots.includes(t)) {
+      return `<div class="time-slot full">${t}</div>`;
+    }
+    const isSelected = selectedTime === t;
+    return `<div class="time-slot${isSelected?' selected':''}" onclick="selectTime('${t}')">${t}</div>`;
+  }).join('');
+
+  document.getElementById('time-slots').innerHTML = html;
+  timeSection.style.display = 'block';
+  document.getElementById('cal-next-btn').style.display = 'none';
+}
+
+function selectTime(time) {
+  selectedTime = time;
+  document.querySelectorAll('.time-slot').forEach(el => {
+    el.classList.toggle('selected', el.textContent === time);
+  });
+  document.getElementById('cal-next-btn').style.display = 'block';
+  renderConfirm();
+}
+
+// ========== 確認画面 ==========
+function renderConfirm() {
+  if (!selectedDate || !selectedTime) return;
+  const d = new Date(selectedDate);
+  const dayNames = ['日','月','火','水','木','金','土'];
+  const dtStr = `${d.getMonth()+1}月${d.getDate()}日（${dayNames[d.getDay()]}）${selectedTime}`;
+  document.getElementById('confirm-datetime').textContent = dtStr;
+
+  if (currentTicket) {
+    const after = currentTicket.remaining_count - 1;
+    document.getElementById('confirm-ticket').textContent = `1回消化 → 残り ${after}回`;
+    document.getElementById('confirm-expiry').textContent = currentTicket.expires_at || '未設定';
+  } else {
+    document.getElementById('confirm-ticket').textContent = 'チケットなし';
+    document.getElementById('confirm-expiry').textContent = '—';
+  }
+}
+
+// ========== 予約確定 ==========
+async function submitBooking() {
+  const btn = document.querySelector('#screen-confirm .cta-btn');
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+
+  const [h, m] = selectedTime.split(':');
+  const dt = new Date(selectedDate);
+  dt.setHours(parseInt(h), parseInt(m), 0, 0);
+
+  const { error } = await sbClient.from('bookings').insert({
+    customer_id: currentCustomer.id,
+    ticket_id: currentTicket?.id || null,
+    scheduled_at: dt.toISOString(),
+    duration_minutes: 60,
+    status: 'confirmed'
+  });
+
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = '予約を確定する';
+    alert('予約に失敗しました。もう一度お試しください。');
+    return;
+  }
+
+  if (currentTicket) {
+    const newRemaining = currentTicket.remaining_count - 1;
+    await sbClient.from('tickets')
+      .update({ remaining_count: newRemaining })
+      .eq('id', currentTicket.id);
+    currentTicket.remaining_count = newRemaining;
+  }
+
+  renderDone(dt);
+  goScreen('screen-done');
+}
+
+function renderDone(dt) {
+  const dayNames = ['日','月','火','水','木','金','土'];
+  const dtStr = `${dt.getMonth()+1}月${dt.getDate()}日（${dayNames[dt.getDay()]}）${selectedTime}`;
+  document.getElementById('done-datetime').textContent = dtStr;
+  const remaining = currentTicket ? currentTicket.remaining_count : '—';
+  document.getElementById('done-remaining').textContent = remaining + '回';
+  document.getElementById('done-line-msg').innerHTML =
+    `✅ 予約が確定しました<br>📅 ${dtStr}<br>🎫 残り${remaining}回<br><br>当日お待ちしております！`;
+
+  try {
+    liff.sendMessages([{
+      type: 'text',
+      text: `✅ 予約確定\n📅 ${dtStr}\n🎫 残り${remaining}回\n\n当日お待ちしております！`
+    }]);
+  } catch(e) {}
+}
+
+// ========== 予約確認一覧 ==========
+async function loadMyBookings() {
+  const el = document.getElementById('my-bookings-content');
+  if (!currentCustomer) { el.innerHTML = '<div class="error-box">顧客情報が見つかりません</div>'; return; }
+  const { data } = await sbClient.from('bookings')
+    .select('*').eq('customer_id', currentCustomer.id)
+    .eq('status', 'confirmed').order('scheduled_at', { ascending: true });
+
+  if (!data || data.length === 0) {
+    el.innerHTML = '<div class="loading">確定済みの予約はありません</div>';
+    return;
+  }
+  const dayNames = ['日','月','火','水','木','金','土'];
+  el.innerHTML = data.map(b => {
+    const dt = new Date(b.scheduled_at);
+    return `<div class="history-item" style="margin-top:8px;">
+      <div class="history-date">${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日（${dayNames[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}</div>
+      <div class="history-title">セミパーソナル ${b.duration_minutes}分</div>
+      <span class="history-badge">確定</span>
+      <button style="float:right;background:none;border:1px solid #f5c6c6;border-radius:6px;padding:3px 10px;font-size:11px;color:#e74c3c;cursor:pointer;margin-top:4px;" onclick="cancelBooking('${b.id}')">キャンセル</button>
+    </div>`;
+  }).join('');
+}
+
+async function cancelBooking(id) {
+  if (!confirm('この予約をキャンセルしますか？')) return;
+  const { error } = await sbClient.from('bookings').update({ status: 'cancelled' }).eq('id', id);
+  if (error) { alert('キャンセルに失敗しました'); return; }
+  if (currentTicket) {
+    await sbClient.from('tickets').update({ remaining_count: currentTicket.remaining_count + 1 }).eq('id', currentTicket.id);
+    currentTicket.remaining_count++;
+  }
+  await loadMyBookings();
+}
+
+// ========== 履歴 ==========
+async function loadHistory() {
+  const el = document.getElementById('history-content');
+  if (!currentCustomer) return;
+  const { data } = await sbClient.from('bookings')
+    .select('*').eq('customer_id', currentCustomer.id)
+    .in('status', ['completed', 'confirmed']).order('scheduled_at', { ascending: false }).limit(20);
+
+  if (!data || data.length === 0) {
+    el.innerHTML = '<div class="loading">履歴がありません</div>';
+    return;
+  }
+  const dayNames = ['日','月','火','水','木','金','土'];
+  const statusLabel = { confirmed: '確定', completed: '完了', cancelled: 'キャンセル' };
+  const statusColor = { confirmed: '#e8f9ef', completed: '#e8f1fc', cancelled: '#ffeaea' };
+  const statusText = { confirmed: '#06C755', completed: '#185FA5', cancelled: '#c0392b' };
+  el.innerHTML = data.map(b => {
+    const dt = new Date(b.scheduled_at);
+    return `<div class="history-item" style="margin-top:8px;">
+      <div class="history-date">${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日（${dayNames[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}</div>
+      <div class="history-title">セミパーソナル ${b.duration_minutes}分</div>
+      <span class="history-badge" style="background:${statusColor[b.status]};color:${statusText[b.status]};">${statusLabel[b.status]}</span>
+    </div>`;
+  }).join('');
+}
+
+// ========== チケット詳細 ==========
+function renderTicketDetail() {
+  const el = document.getElementById('ticket-detail-content');
+  if (!currentTicket) {
+    el.innerHTML = '<div class="loading">チケットが設定されていません<br>スタッフにお問い合わせください</div>';
+    return;
+  }
+  const remaining = currentTicket.remaining_count;
+  const total = currentTicket.total_count;
+  const pct = Math.round((remaining / total) * 100);
+  const barColor = pct > 50 ? '#06C755' : pct > 20 ? '#f0a500' : '#e74c3c';
+  el.innerHTML = `
+    <div class="home-greeting" style="margin:12px;">
+      <div class="ticket-type-label">${currentTicket.plan_type === 'ticket' ? '回数券' : '月額制'}</div>
+      <div class="ticket-count-row" style="margin-top:8px;">
+        <span class="ticket-big">${remaining}</span>
+        <span class="ticket-unit">回 残り</span>
+        <span style="font-size:13px;color:#aaa;margin-left:8px;">/ ${total}回</span>
+      </div>
+      <div class="ticket-bar-bg" style="margin-top:12px;"><div class="ticket-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:12px;">
+        <div style="font-size:13px;color:#888;">有効期限</div>
+        <div style="font-size:13px;font-weight:600;">${currentTicket.expires_at || '未設定'}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;">
+        <div style="font-size:13px;color:#888;">プラン</div>
+        <div style="font-size:13px;font-weight:600;">${currentTicket.plan_type === 'ticket' ? total + '回券' : '月' + total + '回制'}</div>
+      </div>
+      ${remaining <= 3 ? '<div style="margin-top:14px;background:#fff8e1;border-radius:10px;padding:10px;font-size:12px;color:#8a6000;">残り回数が少なくなっています。<br>スタッフにチケットの更新をご相談ください。</div>' : ''}
+    </div>`;
+}
+
+// ========== 画面遷移 ==========
+function goScreen(id) {
+  const current = document.querySelector('.screen.active');
+  if (current) screenHistory.push(current.id);
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  updateHeader(id);
+
+  if (id === 'screen-calendar') renderCalendar();
+  if (id === 'screen-my-bookings') loadMyBookings();
+  if (id === 'screen-history') loadHistory();
+  if (id === 'screen-ticket') renderTicketDetail();
+  if (id === 'screen-confirm') renderConfirm();
+
+  window.scrollTo(0, 0);
+}
+
+function goBack() {
+  if (screenHistory.length > 0) {
+    const prev = screenHistory.pop();
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(prev).classList.add('active');
+    updateHeader(prev);
+    window.scrollTo(0, 0);
+  }
+}
+
+function goHome() {
+  screenHistory = [];
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-home').classList.add('active');
+  updateHeader('screen-home');
+  renderHome();
+  window.scrollTo(0, 0);
+}
+
+function updateHeader(screenId) {
+  const titles = {
+    'screen-home': 'Re:GLOW FITNESS',
+    'screen-calendar': '予約する',
+    'screen-confirm': '予約確認',
+    'screen-done': '予約完了',
+    'screen-my-bookings': '予約確認',
+    'screen-history': '来店履歴',
+    'screen-ticket': 'チケット',
+  };
+  document.getElementById('header-title').textContent = titles[screenId] || 'Re:GLOW FITNESS';
+  const isHome = screenId === 'screen-home' || screenId === 'screen-done';
+  document.getElementById('header-back').style.visibility = isHome ? 'hidden' : 'visible';
+}
+
+// ========== 起動 ==========
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
