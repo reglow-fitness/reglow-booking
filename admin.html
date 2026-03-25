@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Re:GLOW FITNESS 管理画面</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #f5f5f5; color: #111; }
@@ -350,7 +350,7 @@
 
 <script>
 // ========== Supabase 初期化 ==========
-let supabase = null;
+let sbClient = null;
 let currentClientTab = 'all';
 let allClients = [];
 
@@ -360,7 +360,7 @@ function initSupabase() {
   const key = document.getElementById('setting-key').value.trim()
     || 'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
   if (url && key) {
-    supabase = window.supabase.createClient(url, key);
+    sbClient = window.supabase.createClient(url, key);
     return true;
   }
   return false;
@@ -371,7 +371,7 @@ function saveSettings() {
   const url = document.getElementById('setting-url').value.trim();
   const key = document.getElementById('setting-key').value.trim();
   if (!url || !key) { showToast('URLとキーを入力してください'); return; }
-  supabase = window.supabase.createClient(url, key);
+  sbClient = window.supabase.createClient(url, key);
   document.getElementById('setting-status').textContent = '✅ 接続しました！';
   showToast('接続しました！');
   showPage('dashboard', document.querySelector('nav a:first-child'));
@@ -416,15 +416,15 @@ function togglePlanFields(prefix) {
 
 // ========== 全データ読み込み ==========
 async function loadAll() {
-  if (!supabase) return;
+  if (!sbClient) return;
   await loadCustomers();
   await loadDashboard();
 }
 
 // ========== 顧客読み込み ==========
 async function loadCustomers() {
-  if (!supabase) return;
-  const { data, error } = await supabase
+  if (!sbClient) return;
+  const { data, error } = await sbClient
     .from('customers')
     .select('*, tickets(*)')
     .order('created_at', { ascending: false });
@@ -498,13 +498,13 @@ function setClientTab(tab, el) {
 
 // ========== 顧客追加 ==========
 async function addClient() {
-  if (!supabase) { showToast('先に設定画面でSupabaseを設定してください'); return; }
+  if (!sbClient) { showToast('先に設定画面でSupabaseを設定してください'); return; }
   const name = document.getElementById('add-name').value.trim();
   if (!name) { showToast('氏名を入力してください'); return; }
   const phone = document.getElementById('add-phone').value.trim();
   const memo = document.getElementById('add-memo').value.trim();
 
-  const { data: customer, error } = await supabase
+  const { data: customer, error } = await sbClient
     .from('customers').insert({ name, phone, memo }).select().single();
   if (error) { showToast('登録に失敗しました'); return; }
 
@@ -515,7 +515,7 @@ async function addClient() {
     : document.getElementById('add-monthly-count').value);
   const expiry = document.getElementById('add-expiry').value || null;
 
-  await supabase.from('tickets').insert({
+  await sbClient.from('tickets').insert({
     customer_id: customer.id,
     plan_type: planType,
     total_count: total,
@@ -534,7 +534,7 @@ async function addClient() {
 // ========== 顧客削除 ==========
 async function deleteClient(id, name) {
   if (!confirm(`${name} さんのデータを削除しますか？\n予約・チケットも全て削除されます。`)) return;
-  const { error } = await supabase.from('customers').delete().eq('id', id);
+  const { error } = await sbClient.from('customers').delete().eq('id', id);
   if (error) { showToast('削除に失敗しました'); return; }
   showToast(`${name} さんを削除しました`);
   await loadCustomers();
@@ -558,7 +558,7 @@ function openTicketModal(customerId, ticketId, ticket) {
 
 // ========== チケット保存 ==========
 async function saveTicket() {
-  if (!supabase) { showToast('Supabaseが未設定です'); return; }
+  if (!sbClient) { showToast('Supabaseが未設定です'); return; }
   const customerId = document.getElementById('ticket-customer-id').value;
   const ticketId = document.getElementById('ticket-id').value;
   const planType = document.getElementById('ticket-plan-type').value;
@@ -573,9 +573,9 @@ async function saveTicket() {
 
   let error;
   if (ticketId) {
-    ({ error } = await supabase.from('tickets').update(payload).eq('id', ticketId));
+    ({ error } = await sbClient.from('tickets').update(payload).eq('id', ticketId));
   } else {
-    ({ error } = await supabase.from('tickets').insert(payload));
+    ({ error } = await sbClient.from('tickets').insert(payload));
   }
   if (error) { showToast('保存に失敗しました'); return; }
   closeModal('modal-ticket');
@@ -585,8 +585,8 @@ async function saveTicket() {
 
 // ========== 予約読み込み ==========
 async function loadBookings() {
-  if (!supabase) return;
-  const { data, error } = await supabase
+  if (!sbClient) return;
+  const { data, error } = await sbClient
     .from('bookings')
     .select('*, customers(name), tickets(plan_type,total_count)')
     .order('scheduled_at', { ascending: false })
@@ -619,7 +619,7 @@ async function loadBookings() {
 // ========== 予約キャンセル ==========
 async function cancelBooking(id) {
   if (!confirm('この予約をキャンセルしますか？')) return;
-  const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
+  const { error } = await sbClient.from('bookings').update({ status: 'cancelled' }).eq('id', id);
   if (error) { showToast('キャンセルに失敗しました'); return; }
   showToast('予約をキャンセルしました');
   await loadBookings();
@@ -641,8 +641,8 @@ async function openAddBookingModal() {
 async function loadCustomerTickets(customerId) {
   const sel = document.getElementById('booking-ticket-id');
   sel.innerHTML = '<option value="">チケットなし</option>';
-  if (!customerId || !supabase) return;
-  const { data } = await supabase.from('tickets').select('*').eq('customer_id', customerId);
+  if (!customerId || !sbClient) return;
+  const { data } = await sbClient.from('tickets').select('*').eq('customer_id', customerId);
   if (data) {
     for (const t of data) {
       sel.innerHTML += `<option value="${t.id}">${t.plan_type === 'ticket' ? t.total_count+'回券' : '月'+t.total_count+'回制'} (残${t.remaining_count}回)</option>`;
@@ -651,14 +651,14 @@ async function loadCustomerTickets(customerId) {
 }
 
 async function addBooking() {
-  if (!supabase) { showToast('Supabaseが未設定です'); return; }
+  if (!sbClient) { showToast('Supabaseが未設定です'); return; }
   const customerId = document.getElementById('booking-customer-id').value;
   const ticketId = document.getElementById('booking-ticket-id').value;
   const dt = document.getElementById('booking-datetime').value;
   const duration = parseInt(document.getElementById('booking-duration').value);
   if (!customerId || !dt) { showToast('顧客と日時を選択してください'); return; }
 
-  const { error } = await supabase.from('bookings').insert({
+  const { error } = await sbClient.from('bookings').insert({
     customer_id: customerId,
     ticket_id: ticketId || null,
     scheduled_at: new Date(dt).toISOString(),
@@ -670,7 +670,7 @@ async function addBooking() {
   if (ticketId) {
     const ticket = allClients.flatMap(c => c.tickets||[]).find(t => t.id === ticketId);
     if (ticket && ticket.remaining_count > 0) {
-      await supabase.from('tickets').update({ remaining_count: ticket.remaining_count - 1 }).eq('id', ticketId);
+      await sbClient.from('tickets').update({ remaining_count: ticket.remaining_count - 1 }).eq('id', ticketId);
     }
   }
 
@@ -681,7 +681,7 @@ async function addBooking() {
 
 // ========== ダッシュボード ==========
 async function loadDashboard() {
-  if (!supabase) return;
+  if (!sbClient) return;
   document.getElementById('m-customers').textContent = allClients.length;
   const allTickets = allClients.flatMap(c => c.tickets || []);
   document.getElementById('m-tickets').textContent = allTickets.length;
@@ -689,7 +689,7 @@ async function loadDashboard() {
   document.getElementById('m-low').textContent = low;
 
   const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
-  const { count } = await supabase.from('bookings').select('*', { count: 'exact', head: true })
+  const { count } = await sbClient.from('bookings').select('*', { count: 'exact', head: true })
     .gte('scheduled_at', startOfMonth.toISOString()).eq('status','confirmed');
   document.getElementById('m-bookings').textContent = count || 0;
 
@@ -714,7 +714,7 @@ async function loadDashboard() {
     document.getElementById('low-ticket-list').innerHTML = html;
   }
 
-  const { data: recentB } = await supabase.from('bookings')
+  const { data: recentB } = await sbClient.from('bookings')
     .select('*, customers(name)').order('scheduled_at', { ascending: false }).limit(5);
   if (!recentB || recentB.length === 0) {
     document.getElementById('recent-bookings').innerHTML = '<div class="loading">予約がありません</div>';
@@ -739,17 +739,13 @@ async function loadDashboard() {
 
 // ========== 初期化 ==========
 window.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('setting-url').value = 'https://plapbyvgthymszrzbsgl.supabase.co';
-  document.getElementById('setting-key').value = 'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
-
-  if (initSupabase()) {
-    showPage('dashboard', document.querySelector('nav a:first-child'));
-    loadAll();
-  } else {
-    setTimeout(() => showToast('SupabaseのURLとキーを入力して接続してください'), 800);
-  }
-
-  // 予約追加ボタンにイベント設定
+  const FIXED_URL = 'https://plapbyvgthymszrzbsgl.supabase.co';
+  const FIXED_KEY = 'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
+  document.getElementById('setting-url').value = FIXED_URL;
+  document.getElementById('setting-key').value = FIXED_KEY;
+  sbClient = window.supabase.createClient(FIXED_URL, FIXED_KEY);
+  showPage('dashboard', document.querySelector('nav a:first-child'));
+  loadAll();
   document.querySelector('[onclick="openModal(\'modal-add-booking\')"]')
     ?.setAttribute('onclick', 'openAddBookingModal()');
 });
