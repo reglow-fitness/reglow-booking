@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Re:GLOW FITNESS 管理画面</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #f5f5f5; color: #111; }
+
+    /* ========== レイアウト ========== */
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar { width: 200px; background: #fff; border-right: 1px solid #e5e5e5; padding: 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; }
+    .main { flex: 1; padding: 28px 32px; overflow: auto; }
+
+    /* ========== サイドバー ========== */
+    .sidebar-logo { padding: 20px 16px 16px; border-bottom: 1px solid #f0f0f0; }
+    .sidebar-logo h1 { font-size: 13px; font-weight: 600; color: #111; line-height: 1.4; }
+    .sidebar-logo span { font-size: 11px; color: #888; }
+    nav a { display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 13px; color: #555; text-decoration: none; cursor: pointer; border-left: 3px solid transparent; }
+    nav a:hover { background: #f8f8f8; color: #111; }
+    nav a.active { background: #f0f9f4; color: #0a7a4a; font-weight: 600; border-left-color: #06C755; }
+
+    /* ========== ページ切替 ========== */
+    .page { display: none; }
+    .page.active { display: block; }
+    .page-title { font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #111; }
+
+    /* ========== カード ========== */
+    .card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+
+    /* ========== メトリクス ========== */
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+    .metric { background: #f8f8f8; border-radius: 10px; padding: 16px; }
+    .metric-label { font-size: 12px; color: #888; margin-bottom: 6px; }
+    .metric-value { font-size: 26px; font-weight: 600; color: #111; }
+    .metric-sub { font-size: 11px; color: #aaa; margin-top: 3px; }
+
+    /* ========== テーブル ========== */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 600; color: #888; border-bottom: 1px solid #f0f0f0; text-transform: uppercase; letter-spacing: 0.04em; }
+    td { padding: 12px 12px; border-bottom: 1px solid #f7f7f7; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+
+    /* ========== バッジ ========== */
+    .badge { display: inline-block; padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+    .badge-green { background: #e6f7ee; color: #0a7a4a; }
+    .badge-amber { background: #fff8e6; color: #9a6800; }
+    .badge-red { background: #ffeaea; color: #c0392b; }
+    .badge-blue { background: #e8f1fc; color: #1a56a0; }
+    .badge-gray { background: #f0f0f0; color: #666; }
+
+    /* ========== 残数バー ========== */
+    .bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .bar-bg { flex: 1; height: 6px; background: #f0f0f0; border-radius: 99px; overflow: hidden; min-width: 80px; }
+    .bar-fill { height: 100%; border-radius: 99px; }
+    .bar-green { background: #06C755; }
+    .bar-amber { background: #f0a500; }
+    .bar-red { background: #e74c3c; }
+    .bar-text { font-size: 12px; color: #888; min-width: 48px; text-align: right; white-space: nowrap; }
+
+    /* ========== ボタン ========== */
+    .btn { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: #333; transition: all 0.15s; }
+    .btn:hover { background: #f8f8f8; border-color: #bbb; }
+    .btn-primary { background: #06C755; color: #fff; border-color: #06C755; font-weight: 600; }
+    .btn-primary:hover { background: #05b34c; border-color: #05b34c; }
+    .btn-sm { padding: 4px 10px; font-size: 11px; }
+    .btn-danger { background: #fff; color: #e74c3c; border-color: #f5c6c6; }
+    .btn-danger:hover { background: #ffeaea; }
+
+    /* ========== フォーム ========== */
+    .form-row { margin-bottom: 14px; }
+    .form-label { font-size: 12px; color: #555; font-weight: 600; display: block; margin-bottom: 5px; }
+    .form-input { width: 100%; padding: 9px 12px; font-size: 13px; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #111; transition: border-color 0.15s; }
+    .form-input:focus { outline: none; border-color: #06C755; box-shadow: 0 0 0 3px rgba(6,199,85,0.1); }
+    select.form-input { cursor: pointer; }
+
+    /* ========== モーダル ========== */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 14px; padding: 24px; width: 400px; max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+    .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 18px; color: #111; }
+    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+    /* ========== ヘッダーバー ========== */
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .search-input { border: 1px solid #ddd; border-radius: 8px; padding: 7px 12px; font-size: 13px; width: 220px; color: #111; }
+    .search-input:focus { outline: none; border-color: #06C755; }
+
+    /* ========== アバター ========== */
+    .avatar { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+    .name-cell { display: flex; align-items: center; gap: 8px; }
+
+    /* ========== タブ ========== */
+    .tab-bar { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 1px solid #f0f0f0; }
+    .tab { padding: 8px 16px; font-size: 13px; cursor: pointer; color: #888; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+    .tab:hover { color: #333; }
+    .tab.active { color: #06C755; border-bottom-color: #06C755; font-weight: 600; }
+
+    /* ========== トースト通知 ========== */
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #111; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 13px; z-index: 9999; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ========== ローディング ========== */
+    .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
+
+    /* ========== 設定画面 ========== */
+    .settings-box { background: #fff9f0; border: 1px solid #f5dda0; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    .settings-box p { font-size: 13px; color: #8a6000; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+<!-- ========== レイアウト ========== -->
+<div class="layout">
+
+  <!-- サイドバー -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <h1>Re:GLOW FITNESS</h1>
+      <span>管理画面</span>
+    </div>
+    <nav>
+      <a onclick="showPage('dashboard', this)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.8"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.8"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.8"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.8"/></svg>
+        ダッシュボード
+      </a>
+      <a onclick="showPage('clients', this)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M2 14c0-3 2.686-4.5 6-4.5s6 1.5 6 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        顧客・チケット管理
+      </a>
+      <a onclick="showPage('bookings', this)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 1v4M11 1v4M1 7h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        予約一覧
+      </a>
+      <a class="active" onclick="showPage('settings', this)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        設定
+      </a>
+    </nav>
+  </div>
+
+  <!-- メインコンテンツ -->
+  <div class="main">
+
+    <!-- ダッシュボード -->
+    <div class="page" id="page-dashboard">
+      <div class="page-title">ダッシュボード</div>
+      <div class="metrics" id="metrics">
+        <div class="metric"><div class="metric-label">登録顧客数</div><div class="metric-value" id="m-customers">--</div></div>
+        <div class="metric"><div class="metric-label">有効チケット数</div><div class="metric-value" id="m-tickets">--</div></div>
+        <div class="metric"><div class="metric-label">残数5回以下</div><div class="metric-value" id="m-low" style="color:#e74c3c;">--</div></div>
+        <div class="metric"><div class="metric-label">今月の予約数</div><div class="metric-value" id="m-bookings">--</div></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <strong style="font-size:14px;">残数が少ない顧客</strong>
+          <a onclick="showPage('clients', document.querySelector('nav a:nth-child(2)'))" style="font-size:12px;color:#06C755;cursor:pointer;text-decoration:none;">全員見る →</a>
+        </div>
+        <div id="low-ticket-list"><div class="loading">読み込み中...</div></div>
+      </div>
+
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:14px;">直近の予約</strong>
+        <div id="recent-bookings"><div class="loading">読み込み中...</div></div>
+      </div>
+    </div>
+
+    <!-- 顧客・チケット管理 -->
+    <div class="page" id="page-clients">
+      <div class="page-header">
+        <div class="page-title" style="margin:0;">顧客・チケット管理</div>
+        <div style="display:flex;gap:8px;">
+          <input class="search-input" placeholder="顧客名で検索..." oninput="filterClients(this.value)" id="client-search">
+          <button class="btn btn-primary" onclick="openModal('modal-add-client')">+ 顧客追加</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <div class="tab active" onclick="setClientTab('all',this)">全員</div>
+        <div class="tab" onclick="setClientTab('ticket',this)">回数券</div>
+        <div class="tab" onclick="setClientTab('monthly',this)">月額制</div>
+        <div class="tab" onclick="setClientTab('low',this)">残数少ない</div>
+      </div>
+      <div class="card" style="padding:0;">
+        <div id="client-list"><div class="loading">読み込み中...</div></div>
+      </div>
+    </div>
+
+    <!-- 予約一覧 -->
+    <div class="page" id="page-bookings">
+      <div class="page-header">
+        <div class="page-title" style="margin:0;">予約一覧</div>
+        <button class="btn btn-primary" onclick="openModal('modal-add-booking')">+ 予約追加</button>
+      </div>
+      <div class="card" style="padding:0;">
+        <div id="booking-list"><div class="loading">読み込み中...</div></div>
+      </div>
+    </div>
+
+    <!-- 設定 -->
+    <div class="page active" id="page-settings">
+      <div class="page-title">設定</div>
+      <div class="card">
+        <div class="settings-box">
+          <p>⚠️ 以下にSupabaseのURLとAPIキーを入力して「保存」を押してください。<br>一度保存するとブラウザに記憶されます。</p>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Supabase URL</label>
+          <input class="form-input" id="setting-url" placeholder="https://xxxxxxxxxx.supabase.co">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Supabase Publishable Key</label>
+          <input class="form-input" id="setting-key" placeholder="sb_publishable_...">
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">保存して接続</button>
+        <p id="setting-status" style="margin-top:10px;font-size:13px;color:#06C755;"></p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ========== モーダル: 顧客追加 ========== -->
+<div class="modal-overlay" id="modal-add-client" onclick="closeModalOutside(event,'modal-add-client')">
+  <div class="modal">
+    <div class="modal-title">新規顧客追加</div>
+    <div class="form-row"><label class="form-label">氏名 *</label><input class="form-input" id="add-name" placeholder="例：田中 美咲"></div>
+    <div class="form-row"><label class="form-label">電話番号</label><input class="form-input" id="add-phone" placeholder="090-xxxx-xxxx"></div>
+    <div class="form-row"><label class="form-label">メモ</label><input class="form-input" id="add-memo" placeholder="任意"></div>
+    <hr style="border:none;border-top:1px solid #f0f0f0;margin:16px 0;">
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:#555;">初回チケット設定</div>
+    <div class="form-row">
+      <label class="form-label">プラン種別</label>
+      <select class="form-input" id="add-plan-type" onchange="togglePlanFields('add')">
+        <option value="ticket">回数券</option>
+        <option value="monthly">月額制</option>
+      </select>
+    </div>
+    <div class="form-row" id="add-field-ticket">
+      <label class="form-label">回数</label>
+      <select class="form-input" id="add-ticket-count">
+        <option value="10">10回</option>
+        <option value="20">20回</option>
+        <option value="30">30回</option>
+      </select>
+    </div>
+    <div class="form-row" id="add-field-monthly" style="display:none;">
+      <label class="form-label">月の上限回数</label>
+      <select class="form-input" id="add-monthly-count">
+        <option value="4">月4回</option>
+        <option value="8">月8回</option>
+        <option value="12">月12回</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">有効期限</label>
+      <input type="date" class="form-input" id="add-expiry">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add-client')">キャンセル</button>
+      <button class="btn btn-primary" onclick="addClient()">登録する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== モーダル: チケット追加・編集 ========== -->
+<div class="modal-overlay" id="modal-ticket" onclick="closeModalOutside(event,'modal-ticket')">
+  <div class="modal">
+    <div class="modal-title" id="ticket-modal-title">チケット設定</div>
+    <input type="hidden" id="ticket-customer-id">
+    <input type="hidden" id="ticket-id">
+    <div class="form-row">
+      <label class="form-label">プラン種別</label>
+      <select class="form-input" id="ticket-plan-type" onchange="togglePlanFields('ticket')">
+        <option value="ticket">回数券</option>
+        <option value="monthly">月額制</option>
+      </select>
+    </div>
+    <div class="form-row" id="ticket-field-ticket">
+      <label class="form-label">総回数</label>
+      <select class="form-input" id="ticket-total-count">
+        <option value="10">10回</option>
+        <option value="20">20回</option>
+        <option value="30">30回</option>
+      </select>
+    </div>
+    <div class="form-row" id="ticket-field-monthly" style="display:none;">
+      <label class="form-label">月の上限回数</label>
+      <select class="form-input" id="ticket-monthly-count">
+        <option value="4">月4回</option>
+        <option value="8">月8回</option>
+        <option value="12">月12回</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">残回数（手動調整）</label>
+      <input type="number" class="form-input" id="ticket-remaining" min="0" placeholder="0">
+    </div>
+    <div class="form-row">
+      <label class="form-label">有効期限</label>
+      <input type="date" class="form-input" id="ticket-expiry">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-ticket')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveTicket()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== モーダル: 予約追加 ========== -->
+<div class="modal-overlay" id="modal-add-booking" onclick="closeModalOutside(event,'modal-add-booking')">
+  <div class="modal">
+    <div class="modal-title">予約追加</div>
+    <div class="form-row">
+      <label class="form-label">顧客 *</label>
+      <select class="form-input" id="booking-customer-id" onchange="loadCustomerTickets(this.value)">
+        <option value="">選択してください</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">チケット</label>
+      <select class="form-input" id="booking-ticket-id">
+        <option value="">顧客を先に選択</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">日時 *</label>
+      <input type="datetime-local" class="form-input" id="booking-datetime">
+    </div>
+    <div class="form-row">
+      <label class="form-label">時間（分）</label>
+      <select class="form-input" id="booking-duration">
+        <option value="60">60分</option>
+        <option value="90">90分</option>
+        <option value="120">120分</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add-booking')">キャンセル</button>
+      <button class="btn btn-primary" onclick="addBooking()">予約を追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- トースト通知 -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ========== Supabase 初期化 ==========
+let supabase = null;
+let currentClientTab = 'all';
+let allClients = [];
+
+function initSupabase() {
+  const url = document.getElementById('setting-url').value.trim()
+    || 'https://plapbyvgthymszrzbsgl.supabase.co';
+  const key = document.getElementById('setting-key').value.trim()
+    || 'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
+  if (url && key) {
+    supabase = window.supabase.createClient(url, key);
+    return true;
+  }
+  return false;
+}
+
+// ========== 設定 ==========
+function saveSettings() {
+  const url = document.getElementById('setting-url').value.trim();
+  const key = document.getElementById('setting-key').value.trim();
+  if (!url || !key) { showToast('URLとキーを入力してください'); return; }
+  supabase = window.supabase.createClient(url, key);
+  document.getElementById('setting-status').textContent = '✅ 接続しました！';
+  showToast('接続しました！');
+  showPage('dashboard', document.querySelector('nav a:first-child'));
+  loadAll();
+}
+
+// ========== ページ切替 ==========
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  if (name === 'clients') renderClients();
+  if (name === 'bookings') loadBookings();
+  if (name === 'dashboard') loadDashboard();
+}
+
+// ========== トースト ==========
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ========== モーダル ==========
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModalOutside(e, id) { if (e.target.id === id) closeModal(id); }
+
+function togglePlanFields(prefix) {
+  const type = document.getElementById(prefix === 'add' ? 'add-plan-type' : 'ticket-plan-type').value;
+  const isTicket = type === 'ticket';
+  if (prefix === 'add') {
+    document.getElementById('add-field-ticket').style.display = isTicket ? '' : 'none';
+    document.getElementById('add-field-monthly').style.display = isTicket ? 'none' : '';
+  } else {
+    document.getElementById('ticket-field-ticket').style.display = isTicket ? '' : 'none';
+    document.getElementById('ticket-field-monthly').style.display = isTicket ? 'none' : '';
+  }
+}
+
+// ========== 全データ読み込み ==========
+async function loadAll() {
+  if (!supabase) return;
+  await loadCustomers();
+  await loadDashboard();
+}
+
+// ========== 顧客読み込み ==========
+async function loadCustomers() {
+  if (!supabase) return;
+  const { data, error } = await supabase
+    .from('customers')
+    .select('*, tickets(*)')
+    .order('created_at', { ascending: false });
+  if (error) { showToast('顧客データの読み込みに失敗しました'); return; }
+  allClients = data || [];
+  renderClients();
+}
+
+// ========== 顧客テーブル描画 ==========
+const avatarColors = [
+  ['#fff0e6','#c05000'],['#e6f9ef','#0a7a4a'],['#eeeeff','#4040cc'],
+  ['#fff0f6','#c0005a'],['#e8f1fc','#1a56a0'],['#fffbe6','#9a6800']
+];
+function getAvatarColor(name) {
+  const idx = (name.charCodeAt(0) || 0) % avatarColors.length;
+  return avatarColors[idx];
+}
+function getInitials(name) {
+  return name ? name.slice(0, 2) : '??';
+}
+
+function renderClients() {
+  const search = (document.getElementById('client-search')?.value || '').toLowerCase();
+  let list = allClients.filter(c => c.name.toLowerCase().includes(search));
+  if (currentClientTab === 'ticket') list = list.filter(c => c.tickets?.some(t => t.plan_type === 'ticket'));
+  if (currentClientTab === 'monthly') list = list.filter(c => c.tickets?.some(t => t.plan_type === 'monthly'));
+  if (currentClientTab === 'low') list = list.filter(c => c.tickets?.some(t => t.remaining_count <= 5));
+
+  if (list.length === 0) {
+    document.getElementById('client-list').innerHTML = '<div class="loading">顧客が見つかりません</div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>顧客名</th><th>プラン</th><th>残回数</th><th>有効期限</th><th>操作</th></tr></thead><tbody>';
+  for (const c of list) {
+    const ticket = c.tickets?.[0];
+    const [bg, fg] = getAvatarColor(c.name);
+    const remaining = ticket?.remaining_count ?? 0;
+    const total = ticket?.total_count ?? 1;
+    const pct = Math.round((remaining / total) * 100);
+    const barClass = pct > 50 ? 'bar-green' : pct > 20 ? 'bar-amber' : 'bar-red';
+    const planBadge = ticket ? (ticket.plan_type === 'ticket'
+      ? `<span class="badge badge-blue">${total}回券</span>`
+      : `<span class="badge badge-amber">月${total}回制</span>`)
+      : '<span class="badge badge-gray">未設定</span>';
+    const expiry = ticket?.expires_at ? ticket.expires_at.slice(0,10) : '—';
+    html += `<tr>
+      <td><div class="name-cell">
+        <div class="avatar" style="background:${bg};color:${fg};">${getInitials(c.name)}</div>
+        ${c.name}
+      </div></td>
+      <td>${planBadge}</td>
+      <td>${ticket ? `<div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${barClass}" style="width:${pct}%"></div></div><div class="bar-text">${remaining} / ${total}</div></div>` : '—'}</td>
+      <td style="font-size:12px;color:#888;">${expiry}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-sm" style="margin-right:4px;" onclick="openTicketModal('${c.id}','${ticket?.id||''}',${JSON.stringify(ticket||null).replace(/"/g,'&quot;')})">チケット</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}','${c.name}')">削除</button>
+      </td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('client-list').innerHTML = html;
+}
+
+function filterClients(q) { renderClients(); }
+function setClientTab(tab, el) {
+  currentClientTab = tab;
+  document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderClients();
+}
+
+// ========== 顧客追加 ==========
+async function addClient() {
+  if (!supabase) { showToast('先に設定画面でSupabaseを設定してください'); return; }
+  const name = document.getElementById('add-name').value.trim();
+  if (!name) { showToast('氏名を入力してください'); return; }
+  const phone = document.getElementById('add-phone').value.trim();
+  const memo = document.getElementById('add-memo').value.trim();
+
+  const { data: customer, error } = await supabase
+    .from('customers').insert({ name, phone, memo }).select().single();
+  if (error) { showToast('登録に失敗しました'); return; }
+
+  const planType = document.getElementById('add-plan-type').value;
+  const isTicket = planType === 'ticket';
+  const total = parseInt(isTicket
+    ? document.getElementById('add-ticket-count').value
+    : document.getElementById('add-monthly-count').value);
+  const expiry = document.getElementById('add-expiry').value || null;
+
+  await supabase.from('tickets').insert({
+    customer_id: customer.id,
+    plan_type: planType,
+    total_count: total,
+    remaining_count: total,
+    expires_at: expiry
+  });
+
+  closeModal('modal-add-client');
+  document.getElementById('add-name').value = '';
+  document.getElementById('add-phone').value = '';
+  document.getElementById('add-memo').value = '';
+  showToast(`${name} さんを登録しました`);
+  await loadCustomers();
+}
+
+// ========== 顧客削除 ==========
+async function deleteClient(id, name) {
+  if (!confirm(`${name} さんのデータを削除しますか？\n予約・チケットも全て削除されます。`)) return;
+  const { error } = await supabase.from('customers').delete().eq('id', id);
+  if (error) { showToast('削除に失敗しました'); return; }
+  showToast(`${name} さんを削除しました`);
+  await loadCustomers();
+}
+
+// ========== チケットモーダル ==========
+function openTicketModal(customerId, ticketId, ticket) {
+  document.getElementById('ticket-customer-id').value = customerId;
+  document.getElementById('ticket-id').value = ticketId || '';
+  document.getElementById('ticket-modal-title').textContent = ticketId ? 'チケット編集' : 'チケット追加';
+  if (ticket) {
+    document.getElementById('ticket-plan-type').value = ticket.plan_type || 'ticket';
+    document.getElementById('ticket-total-count').value = ticket.total_count || 10;
+    document.getElementById('ticket-monthly-count').value = ticket.total_count || 4;
+    document.getElementById('ticket-remaining').value = ticket.remaining_count ?? '';
+    document.getElementById('ticket-expiry').value = ticket.expires_at || '';
+    togglePlanFields('ticket');
+  }
+  openModal('modal-ticket');
+}
+
+// ========== チケット保存 ==========
+async function saveTicket() {
+  if (!supabase) { showToast('Supabaseが未設定です'); return; }
+  const customerId = document.getElementById('ticket-customer-id').value;
+  const ticketId = document.getElementById('ticket-id').value;
+  const planType = document.getElementById('ticket-plan-type').value;
+  const isTicket = planType === 'ticket';
+  const total = parseInt(isTicket
+    ? document.getElementById('ticket-total-count').value
+    : document.getElementById('ticket-monthly-count').value);
+  const remaining = parseInt(document.getElementById('ticket-remaining').value);
+  const expiry = document.getElementById('ticket-expiry').value || null;
+
+  const payload = { customer_id: customerId, plan_type: planType, total_count: total, remaining_count: isNaN(remaining) ? total : remaining, expires_at: expiry };
+
+  let error;
+  if (ticketId) {
+    ({ error } = await supabase.from('tickets').update(payload).eq('id', ticketId));
+  } else {
+    ({ error } = await supabase.from('tickets').insert(payload));
+  }
+  if (error) { showToast('保存に失敗しました'); return; }
+  closeModal('modal-ticket');
+  showToast('チケットを保存しました');
+  await loadCustomers();
+}
+
+// ========== 予約読み込み ==========
+async function loadBookings() {
+  if (!supabase) return;
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*, customers(name), tickets(plan_type,total_count)')
+    .order('scheduled_at', { ascending: false })
+    .limit(50);
+  if (error) { showToast('予約データの読み込みに失敗しました'); return; }
+
+  if (!data || data.length === 0) {
+    document.getElementById('booking-list').innerHTML = '<div class="loading">予約がありません</div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>日時</th><th>顧客</th><th>メニュー</th><th>状態</th><th>操作</th></tr></thead><tbody>';
+  for (const b of data) {
+    const dt = new Date(b.scheduled_at);
+    const dtStr = `${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    const statusMap = { confirmed: ['確定','badge-green'], cancelled: ['キャンセル','badge-red'], completed: ['完了','badge-gray'] };
+    const [label, cls] = statusMap[b.status] || ['—','badge-gray'];
+    const [bg, fg] = getAvatarColor(b.customers?.name || '');
+    html += `<tr>
+      <td style="font-weight:600;">${dtStr}</td>
+      <td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};font-size:10px;">${getInitials(b.customers?.name||'')}</div>${b.customers?.name||'—'}</div></td>
+      <td>セミパーソナル ${b.duration_minutes}分</td>
+      <td><span class="badge ${cls}">${label}</span></td>
+      <td>${b.status === 'confirmed' ? `<button class="btn btn-sm btn-danger" onclick="cancelBooking('${b.id}')">キャンセル</button>` : '—'}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('booking-list').innerHTML = html;
+}
+
+// ========== 予約キャンセル ==========
+async function cancelBooking(id) {
+  if (!confirm('この予約をキャンセルしますか？')) return;
+  const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
+  if (error) { showToast('キャンセルに失敗しました'); return; }
+  showToast('予約をキャンセルしました');
+  await loadBookings();
+}
+
+// ========== 予約追加モーダル ==========
+async function openAddBookingModal() {
+  const sel = document.getElementById('booking-customer-id');
+  sel.innerHTML = '<option value="">選択してください</option>';
+  for (const c of allClients) {
+    sel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+  }
+  const now = new Date();
+  now.setMinutes(0,0,0);
+  document.getElementById('booking-datetime').value = now.toISOString().slice(0,16);
+  openModal('modal-add-booking');
+}
+
+async function loadCustomerTickets(customerId) {
+  const sel = document.getElementById('booking-ticket-id');
+  sel.innerHTML = '<option value="">チケットなし</option>';
+  if (!customerId || !supabase) return;
+  const { data } = await supabase.from('tickets').select('*').eq('customer_id', customerId);
+  if (data) {
+    for (const t of data) {
+      sel.innerHTML += `<option value="${t.id}">${t.plan_type === 'ticket' ? t.total_count+'回券' : '月'+t.total_count+'回制'} (残${t.remaining_count}回)</option>`;
+    }
+  }
+}
+
+async function addBooking() {
+  if (!supabase) { showToast('Supabaseが未設定です'); return; }
+  const customerId = document.getElementById('booking-customer-id').value;
+  const ticketId = document.getElementById('booking-ticket-id').value;
+  const dt = document.getElementById('booking-datetime').value;
+  const duration = parseInt(document.getElementById('booking-duration').value);
+  if (!customerId || !dt) { showToast('顧客と日時を選択してください'); return; }
+
+  const { error } = await supabase.from('bookings').insert({
+    customer_id: customerId,
+    ticket_id: ticketId || null,
+    scheduled_at: new Date(dt).toISOString(),
+    duration_minutes: duration,
+    status: 'confirmed'
+  });
+  if (error) { showToast('予約の追加に失敗しました'); return; }
+
+  if (ticketId) {
+    const ticket = allClients.flatMap(c => c.tickets||[]).find(t => t.id === ticketId);
+    if (ticket && ticket.remaining_count > 0) {
+      await supabase.from('tickets').update({ remaining_count: ticket.remaining_count - 1 }).eq('id', ticketId);
+    }
+  }
+
+  closeModal('modal-add-booking');
+  showToast('予約を追加しました');
+  await loadAll();
+}
+
+// ========== ダッシュボード ==========
+async function loadDashboard() {
+  if (!supabase) return;
+  document.getElementById('m-customers').textContent = allClients.length;
+  const allTickets = allClients.flatMap(c => c.tickets || []);
+  document.getElementById('m-tickets').textContent = allTickets.length;
+  const low = allTickets.filter(t => t.remaining_count <= 5).length;
+  document.getElementById('m-low').textContent = low;
+
+  const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
+  const { count } = await supabase.from('bookings').select('*', { count: 'exact', head: true })
+    .gte('scheduled_at', startOfMonth.toISOString()).eq('status','confirmed');
+  document.getElementById('m-bookings').textContent = count || 0;
+
+  const lowClients = allClients.filter(c => c.tickets?.some(t => t.remaining_count <= 5));
+  if (lowClients.length === 0) {
+    document.getElementById('low-ticket-list').innerHTML = '<div class="loading">残数が少ない顧客はいません</div>';
+  } else {
+    let html = '<table><thead><tr><th>顧客名</th><th>プラン</th><th>残回数</th><th>期限</th><th>操作</th></tr></thead><tbody>';
+    for (const c of lowClients) {
+      const ticket = c.tickets.find(t => t.remaining_count <= 5);
+      const [bg, fg] = getAvatarColor(c.name);
+      const pct = Math.round((ticket.remaining_count / ticket.total_count) * 100);
+      html += `<tr>
+        <td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};">${getInitials(c.name)}</div>${c.name}</div></td>
+        <td><span class="badge ${ticket.plan_type==='ticket'?'badge-blue':'badge-amber'}">${ticket.plan_type==='ticket'?ticket.total_count+'回券':'月'+ticket.total_count+'回制'}</span></td>
+        <td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${pct<=20?'bar-red':'bar-amber'}" style="width:${pct}%"></div></div><div class="bar-text">${ticket.remaining_count} / ${ticket.total_count}</div></div></td>
+        <td style="font-size:12px;color:#888;">${ticket.expires_at||'—'}</td>
+        <td><button class="btn btn-sm" onclick="openTicketModal('${c.id}','${ticket.id}',${JSON.stringify(ticket).replace(/"/g,'&quot;')})">チケット追加</button></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    document.getElementById('low-ticket-list').innerHTML = html;
+  }
+
+  const { data: recentB } = await supabase.from('bookings')
+    .select('*, customers(name)').order('scheduled_at', { ascending: false }).limit(5);
+  if (!recentB || recentB.length === 0) {
+    document.getElementById('recent-bookings').innerHTML = '<div class="loading">予約がありません</div>';
+  } else {
+    let html = '<table><thead><tr><th>日時</th><th>顧客</th><th>状態</th></tr></thead><tbody>';
+    for (const b of recentB) {
+      const dt = new Date(b.scheduled_at);
+      const dtStr = `${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+      const statusMap = { confirmed: ['確定','badge-green'], cancelled: ['キャンセル','badge-red'], completed: ['完了','badge-gray'] };
+      const [label, cls] = statusMap[b.status] || ['—','badge-gray'];
+      const [bg, fg] = getAvatarColor(b.customers?.name || '');
+      html += `<tr>
+        <td style="font-weight:600;">${dtStr}</td>
+        <td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};font-size:10px;">${getInitials(b.customers?.name||'')}</div>${b.customers?.name||'—'}</div></td>
+        <td><span class="badge ${cls}">${label}</span></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    document.getElementById('recent-bookings').innerHTML = html;
+  }
+}
+
+// ========== 初期化 ==========
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('setting-url').value = 'https://plapbyvgthymszrzbsgl.supabase.co';
+  document.getElementById('setting-key').value = 'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
+
+  if (initSupabase()) {
+    showPage('dashboard', document.querySelector('nav a:first-child'));
+    loadAll();
+  } else {
+    setTimeout(() => showToast('SupabaseのURLとキーを入力して接続してください'), 800);
+  }
+
+  // 予約追加ボタンにイベント設定
+  document.querySelector('[onclick="openModal(\'modal-add-booking\')"]')
+    ?.setAttribute('onclick', 'openAddBookingModal()');
+});
+</script>
+</body>
+</html>
