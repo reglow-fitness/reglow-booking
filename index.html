@@ -524,14 +524,21 @@ async function submitBooking(){
 async function loadMyBookings(){
   const el=document.getElementById('my-bookings-content');
   if(!currentCustomer){el.innerHTML='<div class="error-box">顧客情報が見つかりません</div>';return;}
-  const {data}=await sbClient.from('bookings').select('*').eq('customer_id',currentCustomer.id).eq('status','confirmed').order('scheduled_at',{ascending:true});
+  const {data}=await sbClient.from('bookings').select('*, menus(ticket_cost)').eq('customer_id',currentCustomer.id).eq('status','confirmed').order('scheduled_at',{ascending:true});
   if(!data||data.length===0){el.innerHTML='<div class="loading">確定済みの予約はありません</div>';return;}
   const dn=['日','月','火','水','木','金','土'];
-  el.innerHTML=data.map(b=>{const dt=new Date(b.scheduled_at);return`<div class="history-item" style="margin-top:8px;"><div class="history-date">${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日（${dn[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}</div><div class="history-title">${b.menu_name||'セミパーソナル60分'}</div><span class="history-badge">確定</span><button style="float:right;background:none;border:1px solid #f5c6c6;border-radius:6px;padding:3px 10px;font-size:11px;color:#e74c3c;cursor:pointer;margin-top:4px;" onclick="cancelBooking('${b.id}','${b.ticket_id}')">キャンセル</button></div>`;}).join('');
+  el.innerHTML=data.map(b=>{const dt=new Date(b.scheduled_at);return`<div class="history-item" style="margin-top:8px;"><div class="history-date">${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日（${dn[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}</div><div class="history-title">${b.menu_name||'セミパーソナル60分'}</div><span class="history-badge">確定</span><button style="float:right;background:none;border:1px solid #f5c6c6;border-radius:6px;padding:3px 10px;font-size:11px;color:#e74c3c;cursor:pointer;margin-top:4px;" onclick="cancelBooking('${b.id}','${b.ticket_id}','${b.scheduled_at}',${b.menus?.ticket_cost||0})">キャンセル</button></div>`;}).join('');
 }
 
-async function cancelBooking(id,ticketId){
-  if(!confirm('この予約をキャンセルしますか？'))return;
+async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
+  const now = new Date();
+  const scheduled = new Date(scheduledAt);
+  const diffHours = (scheduled - now) / (1000 * 60 * 60);
+  if(diffHours < 12 && menuTicketCost > 0){
+    if(!confirm('予約まで12時間を切っています。キャンセルしてもチケット1回が消化されます。よろしいですか？'))return;
+  } else {
+    if(!confirm('この予約をキャンセルしますか？'))return;
+  }
   const {data:booking}=await sbClient.from('bookings').select('*,menus(ticket_cost)').eq('id',id).single();
   await sbClient.from('bookings').update({status:'cancelled'}).eq('id',id);
   if(booking?.menus?.ticket_cost>0&&currentTicket){
