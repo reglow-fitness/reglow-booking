@@ -842,7 +842,8 @@ async function loadDashboard() {
 const DAY_NAMES = ['日','月','火','水','木','金','土'];
 
 async function loadWeeklyDay(day, el) {
-  if (!sbClient) { initSupabase(); }
+  if (!sbClient) initSupabase();
+  if (!sbClient) { showToast('Supabase未接続'); return; }
   document.querySelectorAll('#weekly-day-tabs .btn').forEach(b => b.classList.remove('btn-primary'));
   el.classList.add('btn-primary');
   document.getElementById('weekly-day-index').value = day;
@@ -920,7 +921,8 @@ async function loadWeeklySlotList() {
 const DEFAULT_SLOTS = ['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
 
 async function loadSlotSetting() {
-  if (!sbClient) { initSupabase(); }
+  if (!sbClient) initSupabase();
+  if (!sbClient) { showToast('Supabase未接続'); return; }
   const date = document.getElementById('slot-date').value;
   if (!date) { showToast('日付を選択してください'); return; }
   const { data } = await sbClient.from('slot_settings').select('*').eq('date', date).single();
