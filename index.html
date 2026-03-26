@@ -516,6 +516,20 @@ function renderConfirm(){
 async function submitBooking(){
   const btn=document.getElementById('confirm-submit-btn');
   btn.disabled=true;btn.textContent='送信中...';
+  // チケット有効期限チェック
+  if(selectedMenu.ticket_cost > 0 && currentTicket){
+    if(currentTicket.expires_at){
+      const expiry = new Date(currentTicket.expires_at);
+      expiry.setHours(23,59,59,999);
+      const bookingDate = new Date(selectedDate);
+      if(bookingDate > expiry){
+        btn.disabled=false;btn.textContent='予約を確定する';
+        alert('チケットの有効期限が切れています。
+スタッフにお問い合わせください。');
+        return;
+      }
+    }
+  }
   // セミパーソナルは1日1回チェック
   if(selectedMenu.ticket_cost > 0){
     const startOfDay = new Date(selectedDate+'T00:00:00');
