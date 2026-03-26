@@ -420,15 +420,15 @@ async function renderTimeSlots(ds) {
   const { data: weeklySetting } = await sbClient.from('weekly_slot_settings').select('*').eq('day_of_week', dow).single();
   let availableSlots = null;
   let isClosed = false;
-  let semiMax = 2;
+  let semiMaxPerSlot = {};
   if (slotSetting) {
     isClosed = slotSetting.is_closed;
     availableSlots = slotSetting.available_slots;
-    semiMax = slotSetting.semi_max || 2;
+    semiMaxPerSlot = slotSetting.semi_max_per_slot || {};
   } else if (weeklySetting) {
     isClosed = weeklySetting.is_closed;
     availableSlots = weeklySetting.available_slots;
-    semiMax = weeklySetting.semi_max || 2;
+    semiMaxPerSlot = weeklySetting.semi_max_per_slot || {};
   }
   const d=new Date(ds);
   const dn=['日','月','火','水','木','金','土'];
@@ -466,11 +466,12 @@ async function renderTimeSlots(ds) {
     const totalCount = slotBookings.length;
 
     let isFull = false;
+    const slotSemiMax = semiMaxPerSlot[slot] || 2;
     if(isSemiMenu){
-      // セミパーソナル：パーソナルが入ったら不可、定員まで
+      // セミパーソナル：パーソナルが入ったら不可、時間帯ごとの定員まで
       if(personalCount > 0) isFull = true;
-      if(semiCount + jiCount >= semiMax * 2) isFull = true;
-      if(semiCount >= semiMax) isFull = true;
+      if(semiCount + jiCount >= slotSemiMax * 2) isFull = true;
+      if(semiCount >= slotSemiMax) isFull = true;
     } else if(isPersonalMenu){
       // パーソナル（体験）：セミが1名でも入ったら不可
       if(semiCount > 0) isFull = true;
