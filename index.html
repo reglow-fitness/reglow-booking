@@ -524,8 +524,7 @@ async function submitBooking(){
       const bookingDate = new Date(selectedDate);
       if(bookingDate > expiry){
         btn.disabled=false;btn.textContent='予約を確定する';
-        alert('チケットの有効期限が切れています。
-スタッフにお問い合わせください。');
+        alert('チケットの有効期限が切れています。スタッフにお問い合わせください。');
         return;
       }
     }
