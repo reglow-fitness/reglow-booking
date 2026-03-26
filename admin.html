@@ -226,6 +226,15 @@
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:16px;">
             <input type="checkbox" id="weekly-is-closed"> この曜日は全休にする
           </label>
+          <div style="margin-bottom:16px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#555;">A（セミパーソナル）の定員</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;"><input type="radio" name="weekly-semi-max" value="2" checked> 2名（通常）</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;"><input type="radio" name="weekly-semi-max" value="3"> 3名</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;"><input type="radio" name="weekly-semi-max" value="4"> 4名</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;"><input type="radio" name="weekly-semi-max" value="6"> 6名</label>
+            </div>
+          </div>
           <button class="btn btn-primary" onclick="saveWeeklySlot()">保存する</button>
         </div>
         <input type="hidden" id="weekly-day-index">
@@ -248,6 +257,15 @@
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:16px;">
             <input type="checkbox" id="slot-is-closed"> この日は全休にする
           </label>
+          <div style="margin-bottom:16px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#555;">A（セミパーソナル）の定員</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;" id="slot-semi-max-options">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;"><input type="radio" name="slot-semi-max" value="2" checked> 2名（通常）</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;"><input type="radio" name="slot-semi-max" value="3"> 3名</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;"><input type="radio" name="slot-semi-max" value="4"> 4名</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;"><input type="radio" name="slot-semi-max" value="6"> 6名</label>
+            </div>
+          </div>
           <button class="btn btn-primary" onclick="saveSlotSetting()">保存する</button>
         </div>
       </div>
@@ -857,11 +875,12 @@ async function saveWeeklySlot() {
   const isClosed = document.getElementById('weekly-is-closed').checked;
   const checked = [...document.querySelectorAll('.weekly-slot-checkbox:checked')].map(c => c.value);
   const available_slots = isClosed ? [] : checked;
+  const semiMax = parseInt(document.querySelector('input[name="weekly-semi-max"]:checked')?.value || 2);
   const { data: existing } = await sbClient.from('weekly_slot_settings').select('id').eq('day_of_week', day).single();
   if (existing) {
-    await sbClient.from('weekly_slot_settings').update({ available_slots, is_closed: isClosed }).eq('day_of_week', day);
+    await sbClient.from('weekly_slot_settings').update({ available_slots, is_closed: isClosed, semi_max: semiMax }).eq('day_of_week', day);
   } else {
-    await sbClient.from('weekly_slot_settings').insert({ day_of_week: day, available_slots, is_closed: isClosed });
+    await sbClient.from('weekly_slot_settings').insert({ day_of_week: day, available_slots, is_closed: isClosed, semi_max: semiMax });
   }
   showToast(`${DAY_NAMES[day]}曜日の設定を保存しました`);
   await loadWeeklySlotList();
@@ -916,11 +935,12 @@ async function saveSlotSetting() {
   const isClosed = document.getElementById('slot-is-closed').checked;
   const checked = [...document.querySelectorAll('.slot-checkbox:checked')].map(c => c.value);
   const available_slots = isClosed ? [] : checked;
+  const semiMax = parseInt(document.querySelector('input[name="slot-semi-max"]:checked')?.value || 2);
   const { data: existing } = await sbClient.from('slot_settings').select('id').eq('date', date).single();
   if (existing) {
-    await sbClient.from('slot_settings').update({ available_slots, is_closed: isClosed }).eq('date', date);
+    await sbClient.from('slot_settings').update({ available_slots, is_closed: isClosed, semi_max: semiMax }).eq('date', date);
   } else {
-    await sbClient.from('slot_settings').insert({ date, available_slots, is_closed: isClosed });
+    await sbClient.from('slot_settings').insert({ date, available_slots, is_closed: isClosed, semi_max: semiMax });
   }
   showToast('保存しました');
   await loadSlotList();

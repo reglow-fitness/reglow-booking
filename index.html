@@ -420,12 +420,15 @@ async function renderTimeSlots(ds) {
   const { data: weeklySetting } = await sbClient.from('weekly_slot_settings').select('*').eq('day_of_week', dow).single();
   let availableSlots = null;
   let isClosed = false;
+  let semiMax = 2;
   if (slotSetting) {
     isClosed = slotSetting.is_closed;
     availableSlots = slotSetting.available_slots;
+    semiMax = slotSetting.semi_max || 2;
   } else if (weeklySetting) {
     isClosed = weeklySetting.is_closed;
     availableSlots = weeklySetting.available_slots;
+    semiMax = weeklySetting.semi_max || 2;
   }
   const d=new Date(ds);
   const dn=['日','月','火','水','木','金','土'];
@@ -464,10 +467,10 @@ async function renderTimeSlots(ds) {
 
     let isFull = false;
     if(isSemiMenu){
-      // セミパーソナル：パーソナルが入ったら不可、合計4名まで
+      // セミパーソナル：パーソナルが入ったら不可、定員まで
       if(personalCount > 0) isFull = true;
-      if(semiCount + jiCount >= 4) isFull = true;
-      if(semiCount >= 2) isFull = true;
+      if(semiCount + jiCount >= semiMax * 2) isFull = true;
+      if(semiCount >= semiMax) isFull = true;
     } else if(isPersonalMenu){
       // パーソナル（体験）：セミが1名でも入ったら不可
       if(semiCount > 0) isFull = true;
