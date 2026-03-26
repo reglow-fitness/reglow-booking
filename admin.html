@@ -210,6 +210,34 @@
         <div class="page-title" style="margin:0;">予約枠管理</div>
       </div>
       <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:14px;">週間テンプレート設定</strong>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="weekly-day-tabs">
+          <button class="btn" onclick="loadWeeklyDay(0,this)">日</button>
+          <button class="btn" onclick="loadWeeklyDay(1,this)">月</button>
+          <button class="btn" onclick="loadWeeklyDay(2,this)">火</button>
+          <button class="btn" onclick="loadWeeklyDay(3,this)">水</button>
+          <button class="btn" onclick="loadWeeklyDay(4,this)">木</button>
+          <button class="btn" onclick="loadWeeklyDay(5,this)">金</button>
+          <button class="btn" onclick="loadWeeklyDay(6,this)">土</button>
+        </div>
+        <div id="weekly-editor" style="display:none;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:#555;">受付する時間帯を選択</div>
+          <div id="weekly-checkboxes" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:16px;">
+            <input type="checkbox" id="weekly-is-closed"> この曜日は全休にする
+          </label>
+          <button class="btn btn-primary" onclick="saveWeeklySlot()">保存する</button>
+        </div>
+        <input type="hidden" id="weekly-day-index">
+      </div>
+
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:14px;">週間テンプレート一覧</strong>
+        <div id="weekly-slot-list"><div class="loading">読み込み中...</div></div>
+      </div>
+
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:14px;">日付指定の上書き設定</strong>
         <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
           <input type="date" class="form-input" id="slot-date" style="width:180px;">
           <button class="btn btn-primary" onclick="loadSlotSetting()">この日を設定</button>
@@ -432,7 +460,7 @@ function showPage(name, el) {
   if (name === 'clients') renderClients();
   if (name === 'bookings') loadBookings();
   if (name === 'dashboard') loadDashboard();
-  if (name === 'slots') loadSlotList();
+  if (name === 'slots') { loadSlotList(); loadWeeklySlotList(); }
 }
 
 // ========== トースト ==========
@@ -800,6 +828,63 @@ async function loadDashboard() {
     html += '</tbody></table>';
     document.getElementById('recent-bookings').innerHTML = html;
   }
+}
+
+// ========== 週間テンプレート ==========
+const DAY_NAMES = ['日','月','火','水','木','金','土'];
+
+async function loadWeeklyDay(day, el) {
+  document.querySelectorAll('#weekly-day-tabs .btn').forEach(b => b.classList.remove('btn-primary'));
+  el.classList.add('btn-primary');
+  document.getElementById('weekly-day-index').value = day;
+  const { data } = await sbClient.from('weekly_slot_settings').select('*').eq('day_of_week', day).single();
+  const activeSlots = data?.available_slots || DEFAULT_SLOTS;
+  const isClosed = data?.is_closed || false;
+  document.getElementById('weekly-is-closed').checked = isClosed;
+  let html = '';
+  for (const slot of DEFAULT_SLOTS) {
+    const checked = activeSlots.includes(slot) ? 'checked' : '';
+    html += `<label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;">
+      <input type="checkbox" value="${slot}" ${checked} class="weekly-slot-checkbox"> ${slot}
+    </label>`;
+  }
+  document.getElementById('weekly-checkboxes').innerHTML = html;
+  document.getElementById('weekly-editor').style.display = 'block';
+}
+
+async function saveWeeklySlot() {
+  const day = parseInt(document.getElementById('weekly-day-index').value);
+  const isClosed = document.getElementById('weekly-is-closed').checked;
+  const checked = [...document.querySelectorAll('.weekly-slot-checkbox:checked')].map(c => c.value);
+  const available_slots = isClosed ? [] : checked;
+  const { data: existing } = await sbClient.from('weekly_slot_settings').select('id').eq('day_of_week', day).single();
+  if (existing) {
+    await sbClient.from('weekly_slot_settings').update({ available_slots, is_closed: isClosed }).eq('day_of_week', day);
+  } else {
+    await sbClient.from('weekly_slot_settings').insert({ day_of_week: day, available_slots, is_closed: isClosed });
+  }
+  showToast(`${DAY_NAMES[day]}曜日の設定を保存しました`);
+  await loadWeeklySlotList();
+}
+
+async function loadWeeklySlotList() {
+  const { data } = await sbClient.from('weekly_slot_settings').select('*').order('day_of_week');
+  const el = document.getElementById('weekly-slot-list');
+  if (!data || data.length === 0) { el.innerHTML = '<div class="loading">設定がありません</div>'; return; }
+  let html = '<table><thead><tr><th>曜日</th><th>状態</th><th>受付時間</th></tr></thead><tbody>';
+  for (const s of data) {
+    const status = s.is_closed
+      ? '<span class="badge badge-red">全休</span>'
+      : '<span class="badge badge-green">受付あり</span>';
+    const slots = s.is_closed ? '—' : (s.available_slots.join('、') || '—');
+    html += `<tr>
+      <td style="font-weight:600;">${DAY_NAMES[s.day_of_week]}曜日</td>
+      <td>${status}</td>
+      <td style="font-size:12px;color:#555;">${slots}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
 }
 
 // ========== 予約枠管理 ==========
