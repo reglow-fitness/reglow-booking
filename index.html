@@ -505,6 +505,21 @@ async function submitBooking(){
     status:'confirmed'
   });
   if(error){btn.disabled=false;btn.textContent='予約を確定する';alert('予約に失敗しました。もう一度お試しください。');return;}
+  // Googleカレンダーに追加
+  try {
+    const customerName = currentCustomer?.name || 'Unknown';
+    await fetch('https://script.google.com/macros/s/AKfycbxuRunfusrWTJtp_KIEri78ipRY2mHbsC80QR0HifiFdgLCqUCWWQYdYRDQ7MK2dDoU_g/exec', {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'},
+      body: JSON.stringify({
+        action: 'create',
+        bookingId: selectedMenu.id,
+        customerName: customerName,
+        menuName: selectedMenu.name,
+        startTime: dt.toISOString()
+      })
+    });
+  } catch(e) { console.log('GCal error:', e); }
   if(selectedMenu.ticket_cost>0&&currentTicket){
     const nr=currentTicket.remaining_count-selectedMenu.ticket_cost;
     await sbClient.from('tickets').update({remaining_count:nr}).eq('id',currentTicket.id);
@@ -541,6 +556,17 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
   }
   const {data:booking}=await sbClient.from('bookings').select('*,menus(ticket_cost)').eq('id',id).single();
   await sbClient.from('bookings').update({status:'cancelled'}).eq('id',id);
+  // Googleカレンダーから削除
+  try {
+    const {data:bk} = await sbClient.from('bookings').select('gcal_event_id').eq('id',id).single();
+    if(bk?.gcal_event_id){
+      await fetch('https://script.google.com/macros/s/AKfycbxuRunfusrWTJtp_KIEri78ipRY2mHbsC80QR0HifiFdgLCqUCWWQYdYRDQ7MK2dDoU_g/exec', {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain'},
+        body: JSON.stringify({action:'delete', eventId: bk.gcal_event_id})
+      });
+    }
+  } catch(e) { console.log('GCal delete error:', e); }
   if(booking?.menus?.ticket_cost>0&&currentTicket){
     const nr=currentTicket.remaining_count+booking.menus.ticket_cost;
     await sbClient.from('tickets').update({remaining_count:nr}).eq('id',currentTicket.id);
