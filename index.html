@@ -505,10 +505,10 @@ async function submitBooking(){
     status:'confirmed'
   });
   if(error){btn.disabled=false;btn.textContent='予約を確定する';alert('予約に失敗しました。もう一度お試しください。');return;}
-  // Googleカレンダーに追加
+  // Googleカレンダーに追加してイベントIDを保存
   try {
     const customerName = currentCustomer?.name || 'Unknown';
-    await fetch('https://script.google.com/macros/s/AKfycbxuRunfusrWTJtp_KIEri78ipRY2mHbsC80QR0HifiFdgLCqUCWWQYdYRDQ7MK2dDoU_g/exec', {
+    const gcalRes = await fetch('https://script.google.com/macros/s/AKfycbxuRunfusrWTJtp_KIEri78ipRY2mHbsC80QR0HifiFdgLCqUCWWQYdYRDQ7MK2dDoU_g/exec', {
       method: 'POST',
       headers: {'Content-Type': 'text/plain'},
       body: JSON.stringify({
@@ -519,6 +519,15 @@ async function submitBooking(){
         startTime: dt.toISOString()
       })
     });
+    const gcalData = await gcalRes.json();
+    if(gcalData.eventId){
+      const {data:lastBooking} = await sbClient.from('bookings')
+        .select('id').eq('customer_id',currentCustomer.id)
+        .order('created_at',{ascending:false}).limit(1).single();
+      if(lastBooking){
+        await sbClient.from('bookings').update({gcal_event_id: gcalData.eventId}).eq('id',lastBooking.id);
+      }
+    }
   } catch(e) { console.log('GCal error:', e); }
   if(selectedMenu.ticket_cost>0&&currentTicket){
     const nr=currentTicket.remaining_count-selectedMenu.ticket_cost;
