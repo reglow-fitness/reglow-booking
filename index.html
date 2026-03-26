@@ -413,7 +413,20 @@ async function selectDate(ds){
 }
 
 async function renderTimeSlots(ds) {
-  const slots = ['10:00','11:00','14:00','15:00','16:00','17:00','18:00','19:00'];
+  const slots = ['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
+  // 日付指定の上書き設定を確認、なければ週間テンプレートを確認
+  const { data: slotSetting } = await sbClient.from('slot_settings').select('*').eq('date', ds).single();
+  const dow = new Date(ds).getDay();
+  const { data: weeklySetting } = await sbClient.from('weekly_slot_settings').select('*').eq('day_of_week', dow).single();
+  let availableSlots = null;
+  let isClosed = false;
+  if (slotSetting) {
+    isClosed = slotSetting.is_closed;
+    availableSlots = slotSetting.available_slots;
+  } else if (weeklySetting) {
+    isClosed = weeklySetting.is_closed;
+    availableSlots = weeklySetting.available_slots;
+  }
   const d=new Date(ds);
   const dn=['日','月','火','水','木','金','土'];
   document.getElementById('time-section-title').textContent=`${d.getMonth()+1}月${d.getDate()}日（${dn[d.getDay()]}）の空き枠`;
@@ -429,8 +442,15 @@ async function renderTimeSlots(ds) {
   const isSemiMenu = selectedMenu?.ticket_cost > 0;
   const isPersonalMenu = selectedMenu?.ticket_cost === 0 && selectedMenu?.max_per_slot === 1;
 
+  if (isClosed) {
+    document.getElementById('time-slots').innerHTML = '<div style="color:#e74c3c;font-size:13px;">この日は休業日です</div>';
+    document.getElementById('time-section').style.display = 'block';
+    document.getElementById('cal-next-btn').style.display = 'none';
+    return;
+  }
+  const activeSlots = availableSlots && availableSlots.length > 0 ? availableSlots : slots;
   let html = '';
-  for(const slot of slots){
+  for(const slot of activeSlots){
     const [h] = slot.split(':');
     const slotBookings = (existingBookings||[]).filter(b=>{
       const bh = new Date(b.scheduled_at).getHours();
