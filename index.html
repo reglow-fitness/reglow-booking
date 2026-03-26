@@ -453,10 +453,9 @@ async function renderTimeSlots(ds) {
       if(semiCount > 0) isFull = true;
       if(personalCount >= 1) isFull = true;
     } else {
-      // 自主トレ：合計4名まで、自主トレは2名まで
-      if(personalCount > 0) isFull = true;
-      if(totalCount >= 4) isFull = true;
+      // 自主トレ：Bがいても予約可（C2名まで）、A+C合計4名まで
       if(jiCount >= 2) isFull = true;
+      if(semiCount + jiCount >= 4) isFull = true;
     }
 
     const isSel = selectedTime===slot;
