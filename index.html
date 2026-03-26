@@ -516,6 +516,21 @@ function renderConfirm(){
 async function submitBooking(){
   const btn=document.getElementById('confirm-submit-btn');
   btn.disabled=true;btn.textContent='送信中...';
+  // セミパーソナルは1日1回チェック
+  if(selectedMenu.ticket_cost > 0){
+    const startOfDay = new Date(selectedDate+'T00:00:00');
+    const endOfDay = new Date(selectedDate+'T23:59:59');
+    const {data: existing} = await sbClient.from('bookings')
+      .select('id').eq('customer_id', currentCustomer.id)
+      .eq('status','confirmed')
+      .gte('scheduled_at', startOfDay.toISOString())
+      .lte('scheduled_at', endOfDay.toISOString());
+    if(existing && existing.length > 0){
+      btn.disabled=false;btn.textContent='予約を確定する';
+      alert('セミパーソナルは1日1回のみ予約できます。');
+      return;
+    }
+  }
   const [h,m]=selectedTime.split(':');
   const dt=new Date(selectedDate);
   dt.setHours(parseInt(h),parseInt(m),0,0);
