@@ -214,10 +214,32 @@
     <div class="page" id="page-bookings">
       <div class="page-header">
         <div class="page-title" style="margin:0;">予約一覧</div>
-        <button class="btn btn-primary" onclick="openModal('modal-add-booking')">+ 予約追加</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="display:flex;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
+            <button class="btn" id="view-calendar-btn" onclick="setBookingView('calendar')" style="border:none;border-radius:0;border-right:1px solid #ddd;">📅 週間</button>
+            <button class="btn" id="view-list-btn" onclick="setBookingView('list')" style="border:none;border-radius:0;">📋 リスト</button>
+          </div>
+          <button class="btn btn-primary" onclick="openAddBookingModal()">+ 予約追加</button>
+        </div>
       </div>
-      <div class="card" style="padding:0;">
-        <div id="booking-list"><div class="loading">読み込み中...</div></div>
+      <!-- 週間カレンダービュー -->
+      <div id="booking-calendar-view">
+        <div class="card" style="padding:14px 16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <button class="btn" onclick="changeWeek(-1)">‹ 前の週</button>
+            <div id="week-label" style="font-size:14px;font-weight:600;"></div>
+            <button class="btn" onclick="changeWeek(1)">次の週 ›</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow-x:auto;">
+          <div id="week-grid" style="min-width:700px;"></div>
+        </div>
+      </div>
+      <!-- リストビュー -->
+      <div id="booking-list-view" style="display:none;">
+        <div class="card" style="padding:0;">
+          <div id="booking-list"><div class="loading">読み込み中...</div></div>
+        </div>
       </div>
     </div>
 
@@ -709,15 +731,131 @@ async function saveTicket() {
 }
 
 // ========== 予約読み込み ==========
-async function loadBookings() {
+let currentBookingView = 'calendar';
+let currentWeekStart = null;
+
+function setBookingView(view) {
+  currentBookingView = view;
+  document.getElementById('booking-calendar-view').style.display = view === 'calendar' ? '' : 'none';
+  document.getElementById('booking-list-view').style.display = view === 'list' ? '' : 'none';
+  document.getElementById('view-calendar-btn').style.background = view === 'calendar' ? '#f0fdf4' : '';
+  document.getElementById('view-list-btn').style.background = view === 'list' ? '#f0fdf4' : '';
+  if (view === 'calendar') renderWeekCalendar();
+  else loadBookingList();
+}
+
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() - day);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function changeWeek(dir) {
+  currentWeekStart.setDate(currentWeekStart.getDate() + dir * 7);
+  renderWeekCalendar();
+}
+
+const TIME_SLOTS = ['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
+const MENU_COLORS = {
+  'A': { bg:'#e6f7ee', color:'#0a7a4a', border:'#b7e5cc' },
+  'B': { bg:'#e8f1fc', color:'#1a56a0', border:'#b3d0f5' },
+  'C': { bg:'#fff8e6', color:'#9a6800', border:'#f5dda0' },
+};
+
+async function renderWeekCalendar() {
+  if (!sbClient) return;
+  if (!currentWeekStart) currentWeekStart = getWeekStart(new Date());
+  const weekEnd = new Date(currentWeekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  weekEnd.setHours(23,59,59,999);
+
+  // ラベル更新
+  const mn = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const s = currentWeekStart, e = weekEnd;
+  document.getElementById('week-label').textContent =
+    `${s.getFullYear()}年${mn[s.getMonth()]}${s.getDate()}日 〜 ${mn[e.getMonth()]}${e.getDate()}日`;
+
+  const { data: bookings } = await sbClient.from('bookings')
+    .select('*, customers(name), menus(name,ticket_cost)')
+    .gte('scheduled_at', currentWeekStart.toISOString())
+    .lte('scheduled_at', weekEnd.toISOString())
+    .eq('status','confirmed')
+    .order('scheduled_at', { ascending: true });
+
+  const dn = ['日','月','火','水','木','金','土'];
+  const days = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(currentWeekStart);
+    d.setDate(d.getDate()+i);
+    days.push(d);
+  }
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // ヘッダー
+  let html = '<div style="display:grid;grid-template-columns:56px repeat(7,1fr);border-bottom:2px solid #e8e8e8;">';
+  html += '<div style="padding:10px 4px;font-size:11px;color:#aaa;text-align:center;"></div>';
+  for(const d of days){
+    const isToday = d.getTime()===today.getTime();
+    const isSun = d.getDay()===0, isSat = d.getDay()===6;
+    const col = isSun?'#e06060':isSat?'#6090e0':'#333';
+    html += `<div style="padding:8px 4px;text-align:center;${isToday?'background:#f0fdf4;':''}">
+      <div style="font-size:11px;color:${col};font-weight:600;">${dn[d.getDay()]}</div>
+      <div style="font-size:16px;font-weight:${isToday?'700':'500'};color:${isToday?'#06C755':col};">${d.getDate()}</div>
+    </div>`;
+  }
+  html += '</div>';
+
+  // 時間帯グリッド
+  html += '<div style="display:grid;grid-template-columns:56px repeat(7,1fr);">';
+  for(const slot of TIME_SLOTS){
+    const [h] = slot.split(':');
+    html += `<div style="padding:6px 4px;font-size:11px;color:#aaa;text-align:right;border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;display:flex;align-items:flex-start;justify-content:flex-end;">${slot}</div>`;
+    for(const d of days){
+      const isToday = d.getTime()===today.getTime();
+      const dayBookings = (bookings||[]).filter(b=>{
+        const bd = new Date(b.scheduled_at);
+        return bd.getFullYear()===d.getFullYear() && bd.getMonth()===d.getMonth() && bd.getDate()===d.getDate() && bd.getHours()===parseInt(h);
+      });
+      let cellHtml = '';
+      for(const b of dayBookings){
+        const tc = b.menus?.ticket_cost;
+        const menuKey = tc > 0 ? 'A' : b.menus?.name?.includes('体験') ? 'B' : 'C';
+        const mc = MENU_COLORS[menuKey] || MENU_COLORS['A'];
+        const [bg2, fg2] = getAvatarColor(b.customers?.name||'');
+        cellHtml += `<div style="background:${mc.bg};border:1px solid ${mc.border};border-radius:6px;padding:2px 6px;font-size:11px;color:${mc.color};margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${b.customers?.name||''} / ${b.menus?.name||''}" onclick="showBookingDetail('${b.id}','${(b.customers?.name||'').replace(/'/g,'`')}','${b.menus?.name||''}','${b.scheduled_at}')">
+          <span style="font-weight:600;">${b.customers?.name?.slice(0,4)||'—'}</span>
+        </div>`;
+      }
+      html += `<div style="border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;padding:2px;${isToday?'background:#fafffe;':''}">${cellHtml}</div>`;
+    }
+  }
+  html += '</div>';
+  document.getElementById('week-grid').innerHTML = html;
+}
+
+function showBookingDetail(id, name, menu, scheduledAt) {
+  const dt = new Date(scheduledAt);
+  const dn = ['日','月','火','水','木','金','土'];
+  const dtStr = `${dt.getMonth()+1}月${dt.getDate()}日（${dn[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+  if(confirm(`【${name}】
+${menu}
+${dtStr}
+
+この予約をキャンセルしますか？`)){
+    cancelBooking(id);
+  }
+}
+
+async function loadBookingList() {
   if (!sbClient) return;
   const { data, error } = await sbClient
     .from('bookings')
-    .select('*, customers(name), tickets(plan_type,total_count)')
+    .select('*, customers(name), menus(name)')
     .order('scheduled_at', { ascending: false })
     .limit(50);
   if (error) { showToast('予約データの読み込みに失敗しました'); return; }
-
   if (!data || data.length === 0) {
     document.getElementById('booking-list').innerHTML = '<div class="loading">予約がありません</div>';
     return;
@@ -732,13 +870,19 @@ async function loadBookings() {
     html += `<tr>
       <td style="font-weight:600;">${dtStr}</td>
       <td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};font-size:10px;">${getInitials(b.customers?.name||'')}</div>${b.customers?.name||'—'}</div></td>
-      <td>セミパーソナル ${b.duration_minutes}分</td>
+      <td>${b.menus?.name||'—'}</td>
       <td><span class="badge ${cls}">${label}</span></td>
-      <td>${b.status === 'confirmed' ? `<button class="btn btn-sm btn-danger" onclick="cancelBooking('${b.id}')">キャンセル</button>` : '—'}</td>
+      <td>${b.status==='confirmed'?`<button class="btn btn-sm btn-danger" onclick="cancelBooking('${b.id}')">キャンセル</button>`:'—'}</td>
     </tr>`;
   }
   html += '</tbody></table>';
   document.getElementById('booking-list').innerHTML = html;
+}
+
+async function loadBookings() {
+  if (!sbClient) return;
+  currentWeekStart = getWeekStart(new Date());
+  setBookingView('calendar');
 }
 
 // ========== 予約キャンセル ==========
@@ -747,7 +891,8 @@ async function cancelBooking(id) {
   const { error } = await sbClient.from('bookings').update({ status: 'cancelled' }).eq('id', id);
   if (error) { showToast('キャンセルに失敗しました'); return; }
   showToast('予約をキャンセルしました');
-  await loadBookings();
+  if(currentBookingView === 'calendar') await renderWeekCalendar();
+  else await loadBookingList();
 }
 
 // ========== 予約追加モーダル ==========
