@@ -194,6 +194,7 @@
         <div class="page-title" style="margin:0;">顧客・チケット管理</div>
         <div style="display:flex;gap:8px;">
           <input class="search-input" placeholder="顧客名で検索..." oninput="filterClients(this.value)" id="client-search">
+          <button class="btn" id="bulk-ticket-btn" style="display:none;" onclick="openBulkTicketModal()">🎫 一括チケット付与</button>
           <button class="btn btn-primary" onclick="openModal('modal-add-client')">+ 顧客追加</button>
         </div>
       </div>
@@ -416,6 +417,27 @@
   </div>
 </div>
 
+<!-- ========== モーダル: 一括チケット付与 ========== -->
+<div class="modal-overlay" id="modal-bulk-ticket" onclick="closeModalOutside(event,'modal-bulk-ticket')">
+  <div class="modal" style="width:480px;">
+    <div class="modal-title" id="bulk-modal-title">一括チケット付与</div>
+    <div id="bulk-target-info" style="background:#f0fdf4;border-radius:8px;padding:10px 14px;font-size:13px;color:#0a7a4a;margin-bottom:16px;"></div>
+    <div id="bulk-checkbox-list" style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:8px;margin-bottom:14px;"></div>
+    <div class="form-row">
+      <label class="form-label">有効開始日 *</label>
+      <input type="date" class="form-input" id="bulk-valid-from">
+    </div>
+    <div class="form-row">
+      <label class="form-label">有効終了日 *</label>
+      <input type="date" class="form-input" id="bulk-expiry">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-bulk-ticket')">キャンセル</button>
+      <button class="btn btn-primary" onclick="executeBulkTicket()">選択した人に付与する</button>
+    </div>
+  </div>
+</div>
+
 <!-- トースト通知 -->
 <div class="toast" id="toast"></div>
 
@@ -580,6 +602,8 @@ function setClientTab(tab, el) {
   document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   renderClients();
+  const bulkBtn = document.getElementById('bulk-ticket-btn');
+  if(bulkBtn) bulkBtn.style.display = PLAN_TYPES.includes(tab) ? '' : 'none';
 }
 
 // ========== 顧客追加 ==========
@@ -818,6 +842,67 @@ async function toggleTicketPanel(customerId, tr) {
     </div>`;
   }
   panelInner.innerHTML = html;
+}
+
+// ========== 一括チケット付与 ==========
+function openBulkTicketModal() {
+  const planName = PLAN_NAMES[currentClientTab] || currentClientTab;
+  document.getElementById('bulk-modal-title').textContent = `一括チケット付与（${planName}）`;
+  document.getElementById('bulk-target-info').textContent = `プラン: ${planName} ／ 付与したい会員にチェックを入れてください`;
+  // 対象顧客のチェックボックス一覧
+  const targets = allClients.filter(c => c.tickets?.some(t => t.plan_type === currentClientTab));
+  let html = '';
+  if(targets.length === 0){
+    html = '<div style="font-size:13px;color:#aaa;text-align:center;padding:8px;">対象顧客がいません</div>';
+  } else {
+    html += `<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#888;padding:4px 4px 8px;border-bottom:1px solid #f0f0f0;margin-bottom:4px;cursor:pointer;">
+      <input type="checkbox" id="bulk-check-all" onchange="toggleAllBulk(this.checked)"> 全員選択
+    </label>`;
+    for(const c of targets){
+      html += `<label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 4px;cursor:pointer;">
+        <input type="checkbox" class="bulk-check" value="${c.id}"> ${c.name}
+      </label>`;
+    }
+  }
+  document.getElementById('bulk-checkbox-list').innerHTML = html;
+  // デフォルト日付: 翌月1日〜末日
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const nextMonthEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+  document.getElementById('bulk-valid-from').value = nextMonth.toISOString().slice(0,10);
+  document.getElementById('bulk-expiry').value = nextMonthEnd.toISOString().slice(0,10);
+  openModal('modal-bulk-ticket');
+}
+
+function toggleAllBulk(checked) {
+  document.querySelectorAll('.bulk-check').forEach(cb => cb.checked = checked);
+}
+
+async function executeBulkTicket() {
+  const validFrom = document.getElementById('bulk-valid-from').value;
+  const expiry = document.getElementById('bulk-expiry').value;
+  if (!validFrom || !expiry) { showToast('開始日と終了日を入力してください'); return; }
+  const selected = [...document.querySelectorAll('.bulk-check:checked')].map(cb => cb.value);
+  if (selected.length === 0) { showToast('付与する会員を選択してください'); return; }
+  if (!confirm(`${selected.length}名にチケットを付与します。よろしいですか？`)) return;
+  const planType = currentClientTab;
+  const isUnlimited = planType === 'unlimited';
+  const total = isUnlimited ? null : parseInt(planType);
+  let successCount = 0;
+  for (const customerId of selected) {
+    const { error } = await sbClient.from('tickets').insert({
+      customer_id: customerId,
+      plan_type: planType,
+      total_count: total,
+      remaining_count: total,
+      valid_from: validFrom,
+      expires_at: expiry
+    });
+    if (!error) successCount++;
+  }
+  closeModal('modal-bulk-ticket');
+  showToast(`${successCount}名にチケットを付与しました`);
+  await loadCustomers();
 }
 
 // ========== チケット削除 ==========
