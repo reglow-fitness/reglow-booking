@@ -1251,7 +1251,8 @@ async function renderSlotWeekCalendar() {
       const isClosed = ss ? ss.is_closed : (ws ? ws.is_closed : false);
       const availSlots = ss ? ss.available_slots : (ws ? ws.available_slots : DEFAULT_SLOTS);
       const semiMax = ss ? (ss.semi_max_per_slot?.[slot]||2) : (ws ? (ws.semi_max_per_slot?.[slot]||2) : 2);
-      const isAvailable = !isClosed && availSlots?.includes(slot);
+      const hasSetting = ss || ws;  // 設定が存在するか
+      const isAvailable = hasSetting && !isClosed && availSlots?.includes(slot);
       // その時間帯の予約数
       const slotBookings = (bookings||[]).filter(b=>{
         const bd = new Date(b.scheduled_at);
@@ -1261,7 +1262,9 @@ async function renderSlotWeekCalendar() {
       const totalCapacity = semiMax + 2; // セミ定員 + 自主トレ2名
       const remaining = totalCapacity - bookedCount;
       let cellBg, cellBorder, cellText;
-      if(!isAvailable){
+      if(!hasSetting){
+        cellBg='transparent'; cellBorder='transparent'; cellText='';
+      } else if(!isAvailable){
         cellBg='#f5f5f5'; cellBorder='#e8e8e8'; cellText='';
       } else if(bookedCount===0){
         cellBg='#e6f7ee'; cellBorder='#b7e5cc'; cellText=`<div style="font-size:11px;color:#0a7a4a;font-weight:600;">空き${totalCapacity}</div>`;
