@@ -696,17 +696,54 @@ async function loadHistory(){
 
 function renderTicketDetail(){
   const el=document.getElementById('ticket-detail-content');
-  if(!currentTicket){el.innerHTML='<div class="loading">チケットが設定されていません<br>スタッフにお問い合わせください</div>';return;}
-  const isUnlimitedDetail = currentTicket.plan_type === 'unlimited';
-  const periodStr2 = currentTicket.valid_from ? `${currentTicket.valid_from} 〜 ${currentTicket.expires_at||'未設定'}` : (currentTicket.expires_at || '未設定');
-  if(isUnlimitedDetail){
-    el.innerHTML=`<div class="home-greeting" style="margin:12px;"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row" style="margin-top:8px;"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div style="display:flex;justify-content:space-between;margin-top:12px;"><div style="font-size:13px;color:#888;">有効期間</div><div style="font-size:13px;font-weight:600;">${periodStr2}</div></div><div style="margin-top:12px;background:#e8f9ef;border-radius:10px;padding:10px;font-size:12px;color:#0a7a4a;">キャンセルペナルティはありません</div></div>`;
-  } else {
-    const r=currentTicket.remaining_count,t=currentTicket.total_count;
-    const pct=Math.round((r/t)*100);
-    const bc=pct>50?'#06C755':pct>20?'#f0a500':'#e74c3c';
-    el.innerHTML=`<div class="home-greeting" style="margin:12px;"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row" style="margin-top:8px;"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span><span style="font-size:13px;color:#aaa;margin-left:8px;">/ ${t}回</span></div><div class="ticket-bar-bg" style="margin-top:12px;"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div style="display:flex;justify-content:space-between;margin-top:12px;"><div style="font-size:13px;color:#888;">有効期間</div><div style="font-size:13px;font-weight:600;">${periodStr2}</div></div>${r<=3?'<div style="margin-top:14px;background:#fff8e1;border-radius:10px;padding:10px;font-size:12px;color:#8a6000;">残り回数が少なくなっています。<br>スタッフにチケットの更新をご相談ください。</div>':''}</div>`;
+  if(!currentCustomer){el.innerHTML='<div class="loading">チケットが設定されていません<br>スタッフにお問い合わせください</div>';return;}
+  const allTickets = currentCustomer.tickets || [];
+  const todayStr = new Date().toISOString().slice(0,10);
+  // 有効中 + 予定のみ表示（期限切れは除外）
+  const visibleTickets = allTickets.filter(t =>
+    !t.expires_at || t.expires_at >= todayStr
+  ).sort((a,b) => (a.valid_from||'').localeCompare(b.valid_from||''));
+  if(visibleTickets.length === 0){
+    el.innerHTML='<div class="loading">チケットが設定されていません<br>スタッフにお問い合わせください</div>';
+    return;
   }
+  let html = '';
+  for(const t of visibleTickets){
+    const isActive = (!t.valid_from || t.valid_from <= todayStr) && (!t.expires_at || t.expires_at >= todayStr);
+    const isFuture = t.valid_from && t.valid_from > todayStr;
+    const statusLabel = isActive
+      ? '<span style="font-size:11px;background:#e6f7ee;color:#0a7a4a;padding:2px 10px;border-radius:99px;font-weight:600;">有効</span>'
+      : '<span style="font-size:11px;background:#e8f1fc;color:#1a56a0;padding:2px 10px;border-radius:99px;font-weight:600;">予定</span>';
+    const periodStr = (t.valid_from||'—') + ' 〜 ' + (t.expires_at||'—');
+    const isUnlimited = t.plan_type === 'unlimited';
+    const planName = PLAN_NAMES[t.plan_type] || t.plan_type;
+    let countHtml = '';
+    if(isUnlimited){
+      countHtml = `<div style="display:flex;align-items:baseline;gap:4px;margin:10px 0 4px;"><span style="font-size:32px;font-weight:600;line-height:1;">∞</span><span style="font-size:13px;color:#888;">制限なし</span></div>`;
+    } else {
+      const r=t.remaining_count, total=t.total_count;
+      const pct=Math.round((r/total)*100);
+      const bc=pct>50?'#06C755':pct>20?'#f0a500':'#e74c3c';
+      countHtml = `<div style="display:flex;align-items:baseline;gap:4px;margin:10px 0 4px;"><span style="font-size:32px;font-weight:600;line-height:1;">${r}</span><span style="font-size:13px;color:#888;">回 残り</span><span style="font-size:12px;color:#aaa;margin-left:6px;">/ ${total}回</span></div><div class="ticket-bar-bg" style="margin-bottom:8px;"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div>`;
+    }
+    const warnHtml = (!isUnlimited && t.remaining_count <= 3 && isActive)
+      ? '<div style="margin-top:8px;background:#fff8e1;border-radius:10px;padding:8px 10px;font-size:12px;color:#8a6000;">残り回数が少なくなっています</div>' : '';
+    const noPenaltyHtml = isUnlimited
+      ? '<div style="margin-top:8px;background:#e8f9ef;border-radius:10px;padding:8px 10px;font-size:12px;color:#0a7a4a;">キャンセルペナルティはありません</div>' : '';
+    html += `<div style="background:white;margin:8px 12px 0;border-radius:14px;padding:16px;${!isActive?'opacity:0.75;border:1.5px dashed #b0c8f0;':'border:1.5px solid #e8e8e8;'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <div style="font-size:11px;color:#06C755;font-weight:600;">${planName}</div>
+        ${statusLabel}
+      </div>
+      ${countHtml}
+      <div style="display:flex;justify-content:space-between;margin-top:4px;">
+        <div style="font-size:12px;color:#888;">有効期間</div>
+        <div style="font-size:12px;font-weight:600;">${periodStr}</div>
+      </div>
+      ${warnHtml}${noPenaltyHtml}
+    </div>`;
+  }
+  el.innerHTML = html + '<div class="pb"></div>';
 }
 
 function goScreen(id){
