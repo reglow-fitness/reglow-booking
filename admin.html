@@ -247,60 +247,87 @@
     <div class="page" id="page-slots">
       <div class="page-header">
         <div class="page-title" style="margin:0;">予約枠管理</div>
-      </div>
-      <div class="card">
-        <strong style="font-size:14px;display:block;margin-bottom:14px;">週間テンプレート設定</strong>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="weekly-day-tabs">
-          <button class="btn" onclick="loadWeeklyDay(0,this)">日</button>
-          <button class="btn" onclick="loadWeeklyDay(1,this)">月</button>
-          <button class="btn" onclick="loadWeeklyDay(2,this)">火</button>
-          <button class="btn" onclick="loadWeeklyDay(3,this)">水</button>
-          <button class="btn" onclick="loadWeeklyDay(4,this)">木</button>
-          <button class="btn" onclick="loadWeeklyDay(5,this)">金</button>
-          <button class="btn" onclick="loadWeeklyDay(6,this)">土</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" onclick="changeSlotWeek(-1)">‹ 前の週</button>
+          <div id="slot-week-label" style="font-size:13px;font-weight:600;display:flex;align-items:center;padding:0 8px;"></div>
+          <button class="btn" onclick="changeSlotWeek(1)">次の週 ›</button>
+          <button class="btn btn-primary" onclick="openSlotEditModal()">⚙️ 枠を編集</button>
         </div>
-        <div id="weekly-editor" style="display:none;">
-          <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:#555;">受付する時間帯を選択</div>
-          <div id="weekly-checkboxes" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:16px;">
-            <input type="checkbox" id="weekly-is-closed"> この曜日は全休にする
-          </label>
-          <div style="margin-bottom:16px;">
-            <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#555;">A（セミパーソナル）の定員（時間帯ごと）</div>
-            <div id="weekly-semi-max-per-slot"></div>
-          </div>
-          <button class="btn btn-primary" onclick="saveWeeklySlot()">保存する</button>
-        </div>
-        <input type="hidden" id="weekly-day-index">
       </div>
 
-      <div class="card">
-        <strong style="font-size:14px;display:block;margin-bottom:14px;">週間テンプレート一覧</strong>
-        <div id="weekly-slot-list"><div class="loading">読み込み中...</div></div>
+      <!-- 週間カレンダー -->
+      <div class="card" style="padding:0;overflow-x:auto;">
+        <div id="slot-week-grid" style="min-width:700px;"></div>
       </div>
 
-      <div class="card">
-        <strong style="font-size:14px;display:block;margin-bottom:14px;">日付指定の上書き設定</strong>
-        <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
-          <input type="date" class="form-input" id="slot-date" style="width:180px;">
-          <button class="btn btn-primary" onclick="loadSlotSetting()">この日を設定</button>
-        </div>
-        <div id="slot-editor" style="display:none;">
-          <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:#555;">受付する時間帯を選択（チェックを外すと受付しない）</div>
-          <div id="slot-checkboxes" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:16px;">
-            <input type="checkbox" id="slot-is-closed"> この日は全休にする
-          </label>
-          <div style="margin-bottom:16px;">
-            <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#555;">A（セミパーソナル）の定員（時間帯ごと）</div>
-            <div id="slot-semi-max-per-slot"></div>
-          </div>
-          <button class="btn btn-primary" onclick="saveSlotSetting()">保存する</button>
-        </div>
+      <!-- 凡例 -->
+      <div style="display:flex;gap:16px;padding:8px 4px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#e6f7ee;border:1px solid #b7e5cc;"></div>空きあり</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#fff8e1;border:1px solid #f5dda0;"></div>残り少ない</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#ffeaea;border:1px solid #f5c6c6;"></div>満員</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#f0f0f0;border:1px solid #ddd;"></div>受付なし</div>
       </div>
-      <div class="card">
-        <strong style="font-size:14px;display:block;margin-bottom:14px;">設定済みの日程</strong>
-        <div id="slot-list"><div class="loading">読み込み中...</div></div>
+
+      <!-- 枠編集モーダル（既存機能を折りたたみ） -->
+      <div class="card" id="slot-edit-panel" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <strong style="font-size:14px;">予約枠の詳細設定</strong>
+          <button class="btn btn-sm" onclick="document.getElementById('slot-edit-panel').style.display='none'">✕ 閉じる</button>
+        </div>
+        <!-- 週間テンプレート -->
+        <div style="margin-bottom:20px;">
+          <strong style="font-size:13px;display:block;margin-bottom:10px;color:#555;">週間テンプレート設定</strong>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;" id="weekly-day-tabs">
+            <button class="btn btn-sm" onclick="loadWeeklyDay(0,this)">日</button>
+            <button class="btn btn-sm" onclick="loadWeeklyDay(1,this)">月</button>
+            <button class="btn btn-sm" onclick="loadWeeklyDay(2,this)">火</button>
+            <button class="btn btn-sm" onclick="loadWeeklyDay(3,this)">水</button>
+            <button class="btn btn-sm" onclick="loadWeeklyDay(4,this)">木</button>
+            <button class="btn btn-sm" onclick="loadWeeklyDay(5,this)">金</button>
+            <button class="btn btn-sm" onclick="loadWeeklyDay(6,this)">土</button>
+          </div>
+          <div id="weekly-editor" style="display:none;">
+            <div id="weekly-checkboxes" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px;">
+              <input type="checkbox" id="weekly-is-closed"> この曜日は全休にする
+            </label>
+            <div style="margin-bottom:12px;">
+              <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:#555;">A（セミパーソナル）の定員（時間帯ごと）</div>
+              <div id="weekly-semi-max-per-slot"></div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveWeeklySlot()">保存する</button>
+          </div>
+          <input type="hidden" id="weekly-day-index">
+        </div>
+        <hr style="border:none;border-top:1px solid #f0f0f0;margin:16px 0;">
+        <!-- 日付指定上書き -->
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:10px;color:#555;">日付指定の上書き設定</strong>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+            <input type="date" class="form-input" id="slot-date" style="width:160px;">
+            <button class="btn btn-primary btn-sm" onclick="loadSlotSetting()">この日を設定</button>
+          </div>
+          <div id="slot-editor" style="display:none;">
+            <div id="slot-checkboxes" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px;">
+              <input type="checkbox" id="slot-is-closed"> この日は全休にする
+            </label>
+            <div style="margin-bottom:12px;">
+              <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:#555;">A（セミパーソナル）の定員（時間帯ごと）</div>
+              <div id="slot-semi-max-per-slot"></div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveSlotSetting()">保存する</button>
+          </div>
+        </div>
+        <hr style="border:none;border-top:1px solid #f0f0f0;margin:16px 0;">
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:10px;color:#555;">設定済みの日程</strong>
+          <div id="slot-list"><div class="loading">読み込み中...</div></div>
+        </div>
+        <div style="margin-top:16px;">
+          <strong style="font-size:13px;display:block;margin-bottom:10px;color:#555;">週間テンプレート一覧</strong>
+          <div id="weekly-slot-list"><div class="loading">読み込み中...</div></div>
+        </div>
       </div>
     </div>
 
@@ -510,7 +537,7 @@ function showPage(name, el) {
   if (name === 'clients') renderClients();
   if (name === 'bookings') loadBookings();
   if (name === 'dashboard') loadDashboard();
-  if (name === 'slots') { loadSlotList(); loadWeeklySlotList(); }
+  if (name === 'slots') { initSlotWeek(); }
 }
 
 // ========== トースト ==========
@@ -1139,6 +1166,127 @@ async function loadDashboard() {
   }
 }
 
+// ========== 予約枠週間カレンダー ==========
+let slotWeekStart = null;
+
+function openSlotEditModal() {
+  const panel = document.getElementById('slot-edit-panel');
+  panel.style.display = panel.style.display === 'none' ? '' : 'none';
+  if(panel.style.display !== 'none') { loadSlotList(); loadWeeklySlotList(); }
+}
+
+function changeSlotWeek(dir) {
+  slotWeekStart.setDate(slotWeekStart.getDate() + dir * 7);
+  renderSlotWeekCalendar();
+}
+
+async function initSlotWeek() {
+  if (!slotWeekStart) slotWeekStart = getWeekStart(new Date());
+  await renderSlotWeekCalendar();
+}
+
+async function renderSlotWeekCalendar() {
+  if (!sbClient) return;
+  const weekEnd = new Date(slotWeekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  weekEnd.setHours(23,59,59,999);
+
+  const mn = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const s = slotWeekStart, e = weekEnd;
+  document.getElementById('slot-week-label').textContent =
+    `${s.getFullYear()}年${mn[s.getMonth()]}${s.getDate()}日 〜 ${mn[e.getMonth()]}${e.getDate()}日`;
+
+  // 予約データ取得
+  const { data: bookings } = await sbClient.from('bookings')
+    .select('*, menus(ticket_cost,max_per_slot)')
+    .gte('scheduled_at', slotWeekStart.toISOString())
+    .lte('scheduled_at', weekEnd.toISOString())
+    .eq('status','confirmed');
+
+  // スロット設定取得
+  const { data: slotSettings } = await sbClient.from('slot_settings').select('*')
+    .gte('date', slotWeekStart.toISOString().slice(0,10))
+    .lte('date', weekEnd.toISOString().slice(0,10));
+  const { data: weeklySettings } = await sbClient.from('weekly_slot_settings').select('*');
+
+  const dn = ['日','月','火','水','木','金','土'];
+  const days = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(slotWeekStart);
+    d.setDate(d.getDate()+i);
+    days.push(d);
+  }
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // ヘッダー
+  let html = '<div style="display:grid;grid-template-columns:56px repeat(7,1fr);border-bottom:2px solid #e8e8e8;">';
+  html += '<div></div>';
+  for(const d of days){
+    const isToday = d.getTime()===today.getTime();
+    const isSun=d.getDay()===0, isSat=d.getDay()===6;
+    const col=isSun?'#e06060':isSat?'#6090e0':'#333';
+    // スロット設定確認
+    const ds = d.toISOString().slice(0,10);
+    const ss = slotSettings?.find(s=>s.date===ds);
+    const ws = weeklySettings?.find(w=>w.day_of_week===d.getDay());
+    const isClosed = ss ? ss.is_closed : (ws ? ws.is_closed : false);
+    html += `<div style="padding:8px 4px;text-align:center;${isToday?'background:#f0fdf4;':''}${isClosed?'background:#fafafa;':''}">
+      <div style="font-size:11px;color:${col};font-weight:600;">${dn[d.getDay()]}</div>
+      <div style="font-size:16px;font-weight:${isToday?'700':'500'};color:${isToday?'#06C755':col};">${d.getDate()}</div>
+      ${isClosed?'<div style="font-size:10px;color:#e74c3c;font-weight:600;">休業</div>':''}
+    </div>`;
+  }
+  html += '</div>';
+
+  // 時間帯グリッド
+  html += '<div style="display:grid;grid-template-columns:56px repeat(7,1fr);">';
+  for(const slot of DEFAULT_SLOTS){
+    const [h] = slot.split(':');
+    html += `<div style="padding:4px;font-size:11px;color:#aaa;text-align:right;border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:52px;display:flex;align-items:center;justify-content:flex-end;">${slot}</div>`;
+    for(const d of days){
+      const isToday = d.getTime()===today.getTime();
+      const ds = d.toISOString().slice(0,10);
+      const ss = slotSettings?.find(s=>s.date===ds);
+      const ws = weeklySettings?.find(w=>w.day_of_week===d.getDay());
+      const isClosed = ss ? ss.is_closed : (ws ? ws.is_closed : false);
+      const availSlots = ss ? ss.available_slots : (ws ? ws.available_slots : DEFAULT_SLOTS);
+      const semiMax = ss ? (ss.semi_max_per_slot?.[slot]||2) : (ws ? (ws.semi_max_per_slot?.[slot]||2) : 2);
+      const isAvailable = !isClosed && availSlots?.includes(slot);
+      // その時間帯の予約数
+      const slotBookings = (bookings||[]).filter(b=>{
+        const bd = new Date(b.scheduled_at);
+        return bd.getFullYear()===d.getFullYear()&&bd.getMonth()===d.getMonth()&&bd.getDate()===d.getDate()&&bd.getHours()===parseInt(h);
+      });
+      const bookedCount = slotBookings.length;
+      const totalCapacity = semiMax + 2; // セミ定員 + 自主トレ2名
+      const remaining = totalCapacity - bookedCount;
+      let cellBg, cellBorder, cellText;
+      if(!isAvailable){
+        cellBg='#f5f5f5'; cellBorder='#e8e8e8'; cellText='';
+      } else if(bookedCount===0){
+        cellBg='#e6f7ee'; cellBorder='#b7e5cc'; cellText=`<div style="font-size:11px;color:#0a7a4a;font-weight:600;">空き${totalCapacity}</div>`;
+      } else if(remaining<=1){
+        cellBg='#ffeaea'; cellBorder='#f5c6c6'; cellText=`<div style="font-size:11px;color:#c0392b;font-weight:600;">${bookedCount}/${totalCapacity}</div><div style="font-size:10px;color:#e74c3c;">残${remaining}</div>`;
+      } else {
+        cellBg='#fff8e1'; cellBorder='#f5dda0'; cellText=`<div style="font-size:11px;color:#9a6800;font-weight:600;">${bookedCount}/${totalCapacity}</div><div style="font-size:10px;color:#b8860b;">残${remaining}</div>`;
+      }
+      html += `<div style="border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:52px;padding:4px;${isToday?'background-color:'+cellBg+';':''}">
+        <div style="height:100%;background:${cellBg};border:1px solid ${cellBorder};border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${isAvailable?'pointer':'default'};" onclick="${isAvailable?`openSlotQuickEdit('${ds}','${slot}')`:''}">${cellText}</div>
+      </div>`;
+    }
+  }
+  html += '</div>';
+  document.getElementById('slot-week-grid').innerHTML = html;
+}
+
+function openSlotQuickEdit(date, slot) {
+  document.getElementById('slot-date').value = date;
+  document.getElementById('slot-edit-panel').style.display = '';
+  loadSlotSetting();
+  // スクロール
+  document.getElementById('slot-edit-panel').scrollIntoView({behavior:'smooth'});
+}
+
 // ========== 週間テンプレート ==========
 const DAY_NAMES = ['日','月','火','水','木','金','土'];
 
@@ -1196,6 +1344,7 @@ async function saveWeeklySlot() {
   }
   showToast(`${DAY_NAMES[day]}曜日の設定を保存しました`);
   await loadWeeklySlotList();
+  await renderSlotWeekCalendar();
 }
 
 async function loadWeeklySlotList() {
@@ -1277,6 +1426,7 @@ async function saveSlotSetting() {
   }
   showToast('保存しました');
   await loadSlotList();
+  await renderSlotWeekCalendar();
 }
 
 async function loadSlotList() {
