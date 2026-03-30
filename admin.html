@@ -642,13 +642,13 @@ async function saveTicket() {
   const validFrom = document.getElementById('ticket-valid-from').value || null;
   const expiry = document.getElementById('ticket-expiry').value || null;
 
-  const payload = { customer_id: customerId, plan_type: planType, total_count: total, remaining_count: total, valid_from: validFrom, expires_at: expiry };
-
   let error;
   if (ticketId) {
-    ({ error } = await sbClient.from('tickets').update(payload).eq('id', ticketId));
+    const updatePayload = { plan_type: planType, total_count: total, valid_from: validFrom, expires_at: expiry };
+    ({ error } = await sbClient.from('tickets').update(updatePayload).eq('id', ticketId));
   } else {
-    ({ error } = await sbClient.from('tickets').insert(payload));
+    const insertPayload = { customer_id: customerId, plan_type: planType, total_count: total, remaining_count: total, valid_from: validFrom, expires_at: expiry };
+    ({ error } = await sbClient.from('tickets').insert(insertPayload));
   }
   if (error) { showToast('保存に失敗しました'); return; }
   closeModal('modal-ticket');
