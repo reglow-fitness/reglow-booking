@@ -278,7 +278,7 @@ async function loadCustomer() {
   const { data } = await sbClient.from('customers').select('*, tickets(*)').eq('line_user_id', lineProfile.userId);
   if (data && data.length > 0) {
     currentCustomer = data[0];
-    currentTicket = currentCustomer.tickets?.find(t => t.remaining_count > 0) || currentCustomer.tickets?.[0] || null;
+    currentTicket = currentCustomer.tickets?.find(t => t.plan_type === 'unlimited' || t.remaining_count > 0) || currentCustomer.tickets?.[0] || null;
   } else {
     const { data: newC } = await sbClient.from('customers').insert({ name: lineProfile.displayName, line_user_id: lineProfile.userId }).select('*, tickets(*)').single();
     currentCustomer = newC;
@@ -293,10 +293,16 @@ function renderHome() {
   document.getElementById('user-name').textContent = (currentCustomer?.name || '') + ' さん';
   const ta = document.getElementById('ticket-area');
   if (currentTicket) {
-    const r = currentTicket.remaining_count, t = currentTicket.total_count;
-    const pct = Math.round((r/t)*100);
-    const bc = pct > 50 ? '#06C755' : pct > 20 ? '#f0a500' : '#e74c3c';
-    ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${currentTicket.plan_type==='ticket'?'回数券':'月額制'}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-bar-bg"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div class="ticket-exp">有効期限：${currentTicket.expires_at||'未設定'}</div></div>`;
+    const isUnlimited = currentTicket.plan_type === 'unlimited';
+    const periodStr = currentTicket.valid_from ? `${currentTicket.valid_from} 〜 ${currentTicket.expires_at||'未設定'}` : (currentTicket.expires_at || '未設定');
+    if (isUnlimited) {
+      ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">無制限プラン</div><div class="ticket-count-row"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+    } else {
+      const r = currentTicket.remaining_count, t = currentTicket.total_count;
+      const pct = Math.round((r/t)*100);
+      const bc = pct > 50 ? '#06C755' : pct > 20 ? '#f0a500' : '#e74c3c';
+      ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${currentTicket.total_count}回券</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-bar-bg"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+    }
   } else {
     ta.innerHTML = `<div class="ticket-block"><div class="no-ticket">チケットが設定されていません<br>スタッフにお問い合わせください</div></div>`;
   }
@@ -322,7 +328,15 @@ async function renderMenuSelect() {
 
   for (const menu of allMenus) {
     const isSemi = menu.ticket_cost > 0;
-    const hasTicket = currentTicket && currentTicket.remaining_count > 0;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const ticketValid = currentTicket && (
+      currentTicket.plan_type === 'unlimited' || currentTicket.remaining_count > 0
+    ) && (
+      !currentTicket.valid_from || new Date(currentTicket.valid_from) <= today
+    ) && (
+      !currentTicket.expires_at || new Date(currentTicket.expires_at) >= today
+    );
+    const hasTicket = !!ticketValid;
     const isRegistered = !!currentCustomer;
     let disabled = false;
     let badgeText = '';
@@ -505,23 +519,35 @@ function renderConfirm(){
   const dtStr=`${d.getMonth()+1}月${d.getDate()}日（${dn[d.getDay()]}）${selectedTime}`;
   document.getElementById('confirm-menu').textContent=selectedMenu.name;
   document.getElementById('confirm-datetime').textContent=dtStr;
-  if(selectedMenu.ticket_cost>0){
+  const isUnlimitedTicket = currentTicket?.plan_type === 'unlimited';
+  if(selectedMenu.ticket_cost>0 && !isUnlimitedTicket){
     const after=(currentTicket?.remaining_count||0)-selectedMenu.ticket_cost;
     document.getElementById('confirm-ticket').textContent=`${selectedMenu.ticket_cost}回消化 → 残り${after}回`;
   } else {
-    document.getElementById('confirm-ticket').textContent='消化なし';
+    document.getElementById('confirm-ticket').textContent = isUnlimitedTicket ? '消化なし（無制限プラン）' : '消化なし';
   }
+  // 12時間前警告の表示制御
+  const warnEl = document.querySelector('.confirm-warn');
+  if(warnEl) warnEl.style.display = (selectedMenu.ticket_cost>0 && !isUnlimitedTicket) ? '' : 'none';
 }
 
 async function submitBooking(){
   const btn=document.getElementById('confirm-submit-btn');
   btn.disabled=true;btn.textContent='送信中...';
-  // チケット有効期限チェック
+  // チケット有効期間チェック
   if(selectedMenu.ticket_cost > 0 && currentTicket){
+    const bookingDate = new Date(selectedDate);
+    if(currentTicket.valid_from){
+      const vf = new Date(currentTicket.valid_from); vf.setHours(0,0,0,0);
+      if(bookingDate < vf){
+        btn.disabled=false;btn.textContent='予約を確定する';
+        alert('チケットの有効期間がまだ始まっていません。スタッフにお問い合わせください。');
+        return;
+      }
+    }
     if(currentTicket.expires_at){
       const expiry = new Date(currentTicket.expires_at);
       expiry.setHours(23,59,59,999);
-      const bookingDate = new Date(selectedDate);
       if(bookingDate > expiry){
         btn.disabled=false;btn.textContent='予約を確定する';
         alert('チケットの有効期限が切れています。スタッフにお問い合わせください。');
@@ -581,7 +607,7 @@ async function submitBooking(){
       }
     }
   } catch(e) { console.log('GCal error:', e); }
-  if(selectedMenu.ticket_cost>0&&currentTicket){
+  if(selectedMenu.ticket_cost>0&&currentTicket&&currentTicket.plan_type!=='unlimited'){
     const nr=currentTicket.remaining_count-selectedMenu.ticket_cost;
     await sbClient.from('tickets').update({remaining_count:nr}).eq('id',currentTicket.id);
     currentTicket.remaining_count=nr;
@@ -591,7 +617,7 @@ async function submitBooking(){
   const dtStr=`${d.getMonth()+1}月${d.getDate()}日（${dn[d.getDay()]}）${selectedTime}`;
   document.getElementById('done-menu').textContent=selectedMenu.name;
   document.getElementById('done-datetime').textContent=dtStr;
-  document.getElementById('done-remaining').textContent=currentTicket?currentTicket.remaining_count+'回':'—';
+  document.getElementById('done-remaining').textContent=currentTicket?(currentTicket.plan_type==='unlimited'?'無制限':currentTicket.remaining_count+'回'):'—';
   try{liff.sendMessages([{type:'text',text:`✅ 予約確定\n📋 ${selectedMenu.name}\n📅 ${dtStr}\n${selectedMenu.ticket_cost>0?'🎫 残り'+currentTicket.remaining_count+'回\n':''}\n当日お待ちしております！`}]);}catch(e){}
   btn.disabled=false;btn.textContent='予約を確定する';
   goScreen('screen-done');
@@ -610,7 +636,8 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
   const now = new Date();
   const scheduled = new Date(scheduledAt);
   const diffHours = (scheduled - now) / (1000 * 60 * 60);
-  if(diffHours < 12 && menuTicketCost > 0){
+  const isUnlimitedCancel = currentTicket?.plan_type === 'unlimited';
+  if(diffHours < 12 && menuTicketCost > 0 && !isUnlimitedCancel){
     if(!confirm('予約まで12時間を切っています。キャンセルしてもチケット1回が消化されます。よろしいですか？'))return;
   } else {
     if(!confirm('この予約をキャンセルしますか？'))return;
@@ -628,10 +655,13 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
       });
     }
   } catch(e) { console.log('GCal delete error:', e); }
-  if(booking?.menus?.ticket_cost>0&&currentTicket){
-    const nr=currentTicket.remaining_count+booking.menus.ticket_cost;
-    await sbClient.from('tickets').update({remaining_count:nr}).eq('id',currentTicket.id);
-    currentTicket.remaining_count=nr;
+  if(booking?.menus?.ticket_cost>0&&currentTicket&&currentTicket.plan_type!=='unlimited'){
+    const diffH = (new Date(scheduledAt) - new Date()) / (1000 * 60 * 60);
+    if(diffH >= 12){
+      const nr=currentTicket.remaining_count+booking.menus.ticket_cost;
+      await sbClient.from('tickets').update({remaining_count:nr}).eq('id',currentTicket.id);
+      currentTicket.remaining_count=nr;
+    }
   }
   await loadMyBookings();
 }
@@ -651,10 +681,16 @@ async function loadHistory(){
 function renderTicketDetail(){
   const el=document.getElementById('ticket-detail-content');
   if(!currentTicket){el.innerHTML='<div class="loading">チケットが設定されていません<br>スタッフにお問い合わせください</div>';return;}
-  const r=currentTicket.remaining_count,t=currentTicket.total_count;
-  const pct=Math.round((r/t)*100);
-  const bc=pct>50?'#06C755':pct>20?'#f0a500':'#e74c3c';
-  el.innerHTML=`<div class="home-greeting" style="margin:12px;"><div class="ticket-type-label">${currentTicket.plan_type==='ticket'?'回数券':'月額制'}</div><div class="ticket-count-row" style="margin-top:8px;"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span><span style="font-size:13px;color:#aaa;margin-left:8px;">/ ${t}回</span></div><div class="ticket-bar-bg" style="margin-top:12px;"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div style="display:flex;justify-content:space-between;margin-top:12px;"><div style="font-size:13px;color:#888;">有効期限</div><div style="font-size:13px;font-weight:600;">${currentTicket.expires_at||'未設定'}</div></div><div style="display:flex;justify-content:space-between;margin-top:8px;"><div style="font-size:13px;color:#888;">プラン</div><div style="font-size:13px;font-weight:600;">${currentTicket.plan_type==='ticket'?t+'回券':'月'+t+'回制'}</div></div>${r<=3?'<div style="margin-top:14px;background:#fff8e1;border-radius:10px;padding:10px;font-size:12px;color:#8a6000;">残り回数が少なくなっています。<br>スタッフにチケットの更新をご相談ください。</div>':''}</div>`;
+  const isUnlimitedDetail = currentTicket.plan_type === 'unlimited';
+  const periodStr2 = currentTicket.valid_from ? `${currentTicket.valid_from} 〜 ${currentTicket.expires_at||'未設定'}` : (currentTicket.expires_at || '未設定');
+  if(isUnlimitedDetail){
+    el.innerHTML=`<div class="home-greeting" style="margin:12px;"><div class="ticket-type-label">無制限プラン</div><div class="ticket-count-row" style="margin-top:8px;"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div style="display:flex;justify-content:space-between;margin-top:12px;"><div style="font-size:13px;color:#888;">有効期間</div><div style="font-size:13px;font-weight:600;">${periodStr2}</div></div><div style="margin-top:12px;background:#e8f9ef;border-radius:10px;padding:10px;font-size:12px;color:#0a7a4a;">キャンセルペナルティはありません</div></div>`;
+  } else {
+    const r=currentTicket.remaining_count,t=currentTicket.total_count;
+    const pct=Math.round((r/t)*100);
+    const bc=pct>50?'#06C755':pct>20?'#f0a500':'#e74c3c';
+    el.innerHTML=`<div class="home-greeting" style="margin:12px;"><div class="ticket-type-label">${t}回券</div><div class="ticket-count-row" style="margin-top:8px;"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span><span style="font-size:13px;color:#aaa;margin-left:8px;">/ ${t}回</span></div><div class="ticket-bar-bg" style="margin-top:12px;"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div style="display:flex;justify-content:space-between;margin-top:12px;"><div style="font-size:13px;color:#888;">有効期間</div><div style="font-size:13px;font-weight:600;">${periodStr2}</div></div>${r<=3?'<div style="margin-top:14px;background:#fff8e1;border-radius:10px;padding:10px;font-size:12px;color:#8a6000;">残り回数が少なくなっています。<br>スタッフにチケットの更新をご相談ください。</div>':''}</div>`;
+  }
 }
 
 function goScreen(id){

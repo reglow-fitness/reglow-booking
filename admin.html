@@ -300,28 +300,21 @@
     <div class="form-row">
       <label class="form-label">プラン種別</label>
       <select class="form-input" id="add-plan-type" onchange="togglePlanFields('add')">
-        <option value="ticket">回数券</option>
-        <option value="monthly">月額制</option>
+        <option value="4">4回券</option>
+        <option value="8">8回券</option>
+        <option value="unlimited">無制限</option>
       </select>
     </div>
-    <div class="form-row" id="add-field-ticket">
-      <label class="form-label">回数</label>
-      <select class="form-input" id="add-ticket-count">
-        <option value="10">10回</option>
-        <option value="20">20回</option>
-        <option value="30">30回</option>
-      </select>
-    </div>
-    <div class="form-row" id="add-field-monthly" style="display:none;">
-      <label class="form-label">月の上限回数</label>
-      <select class="form-input" id="add-monthly-count">
-        <option value="4">月4回</option>
-        <option value="8">月8回</option>
-        <option value="12">月12回</option>
-      </select>
+    <div class="form-row" id="add-field-remaining">
+      <label class="form-label">残回数（初期値）</label>
+      <input type="number" class="form-input" id="add-remaining" min="0" placeholder="プランに合わせて自動入力">
     </div>
     <div class="form-row">
-      <label class="form-label">有効期限</label>
+      <label class="form-label">有効開始日 *</label>
+      <input type="date" class="form-input" id="add-valid-from">
+    </div>
+    <div class="form-row">
+      <label class="form-label">有効終了日 *</label>
       <input type="date" class="form-input" id="add-expiry">
     </div>
     <div class="modal-footer">
@@ -340,32 +333,21 @@
     <div class="form-row">
       <label class="form-label">プラン種別</label>
       <select class="form-input" id="ticket-plan-type" onchange="togglePlanFields('ticket')">
-        <option value="ticket">回数券</option>
-        <option value="monthly">月額制</option>
+        <option value="4">4回券</option>
+        <option value="8">8回券</option>
+        <option value="unlimited">無制限</option>
       </select>
     </div>
-    <div class="form-row" id="ticket-field-ticket">
-      <label class="form-label">総回数</label>
-      <select class="form-input" id="ticket-total-count">
-        <option value="10">10回</option>
-        <option value="20">20回</option>
-        <option value="30">30回</option>
-      </select>
-    </div>
-    <div class="form-row" id="ticket-field-monthly" style="display:none;">
-      <label class="form-label">月の上限回数</label>
-      <select class="form-input" id="ticket-monthly-count">
-        <option value="4">月4回</option>
-        <option value="8">月8回</option>
-        <option value="12">月12回</option>
-      </select>
-    </div>
-    <div class="form-row">
+    <div class="form-row" id="ticket-field-remaining">
       <label class="form-label">残回数（手動調整）</label>
-      <input type="number" class="form-input" id="ticket-remaining" min="0" placeholder="0">
+      <input type="number" class="form-input" id="ticket-remaining" min="0" placeholder="無制限は入力不要">
     </div>
     <div class="form-row">
-      <label class="form-label">有効期限</label>
+      <label class="form-label">有効開始日 *</label>
+      <input type="date" class="form-input" id="ticket-valid-from">
+    </div>
+    <div class="form-row">
+      <label class="form-label">有効終了日 *</label>
       <input type="date" class="form-input" id="ticket-expiry">
     </div>
     <div class="modal-footer">
@@ -485,14 +467,15 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 function closeModalOutside(e, id) { if (e.target.id === id) closeModal(id); }
 
 function togglePlanFields(prefix) {
-  const type = document.getElementById(prefix === 'add' ? 'add-plan-type' : 'ticket-plan-type').value;
-  const isTicket = type === 'ticket';
-  if (prefix === 'add') {
-    document.getElementById('add-field-ticket').style.display = isTicket ? '' : 'none';
-    document.getElementById('add-field-monthly').style.display = isTicket ? 'none' : '';
-  } else {
-    document.getElementById('ticket-field-ticket').style.display = isTicket ? '' : 'none';
-    document.getElementById('ticket-field-monthly').style.display = isTicket ? 'none' : '';
+  const isAdd = prefix === 'add';
+  const type = document.getElementById(isAdd ? 'add-plan-type' : 'ticket-plan-type').value;
+  const isUnlimited = type === 'unlimited';
+  const remainingId = isAdd ? 'add-field-remaining' : 'ticket-field-remaining';
+  document.getElementById(remainingId).style.display = isUnlimited ? 'none' : '';
+  if (isAdd) {
+    const count = type === '4' ? 4 : type === '8' ? 8 : null;
+    if (count !== null) document.getElementById('add-remaining').value = count;
+    else document.getElementById('add-remaining').value = '';
   }
 }
 
@@ -547,18 +530,21 @@ function renderClients() {
     const total = ticket?.total_count ?? 1;
     const pct = Math.round((remaining / total) * 100);
     const barClass = pct > 50 ? 'bar-green' : pct > 20 ? 'bar-amber' : 'bar-red';
-    const planBadge = ticket ? (ticket.plan_type === 'ticket'
-      ? `<span class="badge badge-blue">${total}回券</span>`
-      : `<span class="badge badge-amber">月${total}回制</span>`)
+    const planBadge = ticket ? (
+      ticket.plan_type === 'unlimited'
+        ? '<span class="badge badge-green">無制限</span>'
+        : `<span class="badge badge-blue">${total}回券</span>`)
       : '<span class="badge badge-gray">未設定</span>';
-    const expiry = ticket?.expires_at ? ticket.expires_at.slice(0,10) : '—';
+    const periodStart = ticket?.valid_from ? ticket.valid_from : null;
+    const periodEnd = ticket?.expires_at ? ticket.expires_at.slice(0,10) : null;
+    const expiry = periodStart ? `${periodStart} 〜 ${periodEnd||'未設定'}` : (periodEnd || '—');
     html += `<tr>
       <td><div class="name-cell">
         <div class="avatar" style="background:${bg};color:${fg};">${getInitials(c.name)}</div>
         ${c.name}
       </div></td>
       <td>${planBadge}</td>
-      <td>${ticket ? `<div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${barClass}" style="width:${pct}%"></div></div><div class="bar-text">${remaining} / ${total}</div></div>` : '—'}</td>
+      <td>${ticket ? (ticket.plan_type === 'unlimited' ? '<span class="badge badge-green">∞ 無制限</span>' : `<div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${barClass}" style="width:${pct}%"></div></div><div class="bar-text">${remaining} / ${total}</div></div>`) : '—'}</td>
       <td style="font-size:12px;color:#888;">${expiry}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn-sm" style="margin-right:4px;" onclick="openEditNameModal('${c.id}','${c.name}')">名前変更</button>
@@ -592,17 +578,18 @@ async function addClient() {
   if (error) { showToast('登録に失敗しました'); return; }
 
   const planType = document.getElementById('add-plan-type').value;
-  const isTicket = planType === 'ticket';
-  const total = parseInt(isTicket
-    ? document.getElementById('add-ticket-count').value
-    : document.getElementById('add-monthly-count').value);
+  const isUnlimited = planType === 'unlimited';
+  const total = isUnlimited ? null : parseInt(planType);
+  const remaining = isUnlimited ? null : (parseInt(document.getElementById('add-remaining').value) || total);
+  const validFrom = document.getElementById('add-valid-from').value || null;
   const expiry = document.getElementById('add-expiry').value || null;
 
   await sbClient.from('tickets').insert({
     customer_id: customer.id,
     plan_type: planType,
     total_count: total,
-    remaining_count: total,
+    remaining_count: remaining,
+    valid_from: validFrom,
     expires_at: expiry
   });
 
@@ -647,10 +634,10 @@ function openTicketModal(customerId, ticketId, ticket) {
   document.getElementById('ticket-id').value = ticketId || '';
   document.getElementById('ticket-modal-title').textContent = ticketId ? 'チケット編集' : 'チケット追加';
   if (ticket) {
-    document.getElementById('ticket-plan-type').value = ticket.plan_type || 'ticket';
-    document.getElementById('ticket-total-count').value = ticket.total_count || 10;
-    document.getElementById('ticket-monthly-count').value = ticket.total_count || 4;
+    const pt = ticket.plan_type || '4';
+    document.getElementById('ticket-plan-type').value = pt;
     document.getElementById('ticket-remaining').value = ticket.remaining_count ?? '';
+    document.getElementById('ticket-valid-from').value = ticket.valid_from || '';
     document.getElementById('ticket-expiry').value = ticket.expires_at || '';
     togglePlanFields('ticket');
   }
@@ -663,14 +650,13 @@ async function saveTicket() {
   const customerId = document.getElementById('ticket-customer-id').value;
   const ticketId = document.getElementById('ticket-id').value;
   const planType = document.getElementById('ticket-plan-type').value;
-  const isTicket = planType === 'ticket';
-  const total = parseInt(isTicket
-    ? document.getElementById('ticket-total-count').value
-    : document.getElementById('ticket-monthly-count').value);
-  const remaining = parseInt(document.getElementById('ticket-remaining').value);
+  const isUnlimited = planType === 'unlimited';
+  const total = isUnlimited ? null : parseInt(planType);
+  const remaining = isUnlimited ? null : parseInt(document.getElementById('ticket-remaining').value);
+  const validFrom = document.getElementById('ticket-valid-from').value || null;
   const expiry = document.getElementById('ticket-expiry').value || null;
 
-  const payload = { customer_id: customerId, plan_type: planType, total_count: total, remaining_count: isNaN(remaining) ? total : remaining, expires_at: expiry };
+  const payload = { customer_id: customerId, plan_type: planType, total_count: total, remaining_count: (isUnlimited || isNaN(remaining)) ? total : remaining, valid_from: validFrom, expires_at: expiry };
 
   let error;
   if (ticketId) {
@@ -746,7 +732,7 @@ async function loadCustomerTickets(customerId) {
   const { data } = await sbClient.from('tickets').select('*').eq('customer_id', customerId);
   if (data) {
     for (const t of data) {
-      sel.innerHTML += `<option value="${t.id}">${t.plan_type === 'ticket' ? t.total_count+'回券' : '月'+t.total_count+'回制'} (残${t.remaining_count}回)</option>`;
+      const label = t.plan_type === 'unlimited' ? '無制限' : t.total_count+'回券'; sel.innerHTML += `<option value="${t.id}">${label}${t.plan_type !== 'unlimited' ? ' (残'+t.remaining_count+'回)' : ''}</option>`;
     }
   }
 }
@@ -786,7 +772,7 @@ async function loadDashboard() {
   document.getElementById('m-customers').textContent = allClients.length;
   const allTickets = allClients.flatMap(c => c.tickets || []);
   document.getElementById('m-tickets').textContent = allTickets.length;
-  const low = allTickets.filter(t => t.remaining_count <= 5).length;
+  const low = allTickets.filter(t => t.plan_type !== 'unlimited' && t.remaining_count <= 5).length;
   document.getElementById('m-low').textContent = low;
 
   const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
@@ -794,7 +780,7 @@ async function loadDashboard() {
     .gte('scheduled_at', startOfMonth.toISOString()).eq('status','confirmed');
   document.getElementById('m-bookings').textContent = count || 0;
 
-  const lowClients = allClients.filter(c => c.tickets?.some(t => t.remaining_count <= 5));
+  const lowClients = allClients.filter(c => c.tickets?.some(t => t.plan_type !== 'unlimited' && t.remaining_count <= 5));
   if (lowClients.length === 0) {
     document.getElementById('low-ticket-list').innerHTML = '<div class="loading">残数が少ない顧客はいません</div>';
   } else {
@@ -802,12 +788,12 @@ async function loadDashboard() {
     for (const c of lowClients) {
       const ticket = c.tickets.find(t => t.remaining_count <= 5);
       const [bg, fg] = getAvatarColor(c.name);
-      const pct = Math.round((ticket.remaining_count / ticket.total_count) * 100);
+      const pct = ticket.total_count ? Math.round((ticket.remaining_count / ticket.total_count) * 100) : 0;
       html += `<tr>
         <td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};">${getInitials(c.name)}</div>${c.name}</div></td>
-        <td><span class="badge ${ticket.plan_type==='ticket'?'badge-blue':'badge-amber'}">${ticket.plan_type==='ticket'?ticket.total_count+'回券':'月'+ticket.total_count+'回制'}</span></td>
+        <td><span class="badge badge-blue">${ticket.total_count}回券</span></td>
         <td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${pct<=20?'bar-red':'bar-amber'}" style="width:${pct}%"></div></div><div class="bar-text">${ticket.remaining_count} / ${ticket.total_count}</div></div></td>
-        <td style="font-size:12px;color:#888;">${ticket.expires_at||'—'}</td>
+        <td style="font-size:12px;color:#888;">${ticket.valid_from||''}〜${ticket.expires_at||'—'}</td>
         <td><button class="btn btn-sm" onclick="openTicketModal('${c.id}','${ticket.id}',${JSON.stringify(ticket).replace(/"/g,'&quot;')})">チケット追加</button></td>
       </tr>`;
     }
