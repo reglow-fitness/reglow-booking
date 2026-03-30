@@ -770,7 +770,7 @@ async function addBooking() {
 
   if (ticketId) {
     const ticket = allClients.flatMap(c => c.tickets||[]).find(t => t.id === ticketId);
-    if (ticket && ticket.remaining_count > 0) {
+    if (ticket && ticket.plan_type !== 'unlimited' && ticket.remaining_count > 0) {
       await sbClient.from('tickets').update({ remaining_count: ticket.remaining_count - 1 }).eq('id', ticketId);
     }
   }

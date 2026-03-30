@@ -571,13 +571,15 @@ async function submitBooking(){
       }
     }
   }
-  // セミパーソナルは1日1回チェック
+  // セミパーソナル（メニューA）は1日1回チェック
   if(selectedMenu.ticket_cost > 0){
     const startOfDay = new Date(selectedDate+'T00:00:00');
     const endOfDay = new Date(selectedDate+'T23:59:59');
     const {data: existing} = await sbClient.from('bookings')
-      .select('id').eq('customer_id', currentCustomer.id)
+      .select('id, menu_id')
+      .eq('customer_id', currentCustomer.id)
       .eq('status','confirmed')
+      .eq('menu_id', selectedMenu.id)
       .gte('scheduled_at', startOfDay.toISOString())
       .lte('scheduled_at', endOfDay.toISOString());
     if(existing && existing.length > 0){
@@ -626,7 +628,9 @@ async function submitBooking(){
   if(selectedMenu.ticket_cost>0&&currentTicket&&currentTicket.plan_type!=='unlimited'){
     const nr=currentTicket.remaining_count-selectedMenu.ticket_cost;
     await sbClient.from('tickets').update({remaining_count:nr}).eq('id',currentTicket.id);
-    currentTicket.remaining_count=nr;
+    // DBから再取得してメモリを同期
+    const {data: refreshed} = await sbClient.from('customers').select('*, tickets(*)').eq('id', currentCustomer.id).single();
+    if(refreshed){ currentCustomer = refreshed; currentTicket = refreshed.tickets?.find(t=>{const td=new Date().toISOString().slice(0,10);return(!t.valid_from||t.valid_from<=td)&&(!t.expires_at||t.expires_at>=td)&&(t.plan_type==='unlimited'||t.remaining_count>0);}) || refreshed.tickets?.[0] || null; }
   }
   const dn=['日','月','火','水','木','金','土'];
   const d=new Date(selectedDate);
@@ -671,14 +675,19 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
       });
     }
   } catch(e) { console.log('GCal delete error:', e); }
-  if(booking?.menus?.ticket_cost>0&&currentTicket&&currentTicket.plan_type!=='unlimited'){
-    const diffH = (new Date(scheduledAt) - new Date()) / (1000 * 60 * 60);
-    if(diffH >= 12){
-      const nr=currentTicket.remaining_count+booking.menus.ticket_cost;
-      await sbClient.from('tickets').update({remaining_count:nr}).eq('id',currentTicket.id);
-      currentTicket.remaining_count=nr;
+  if(booking?.menus?.ticket_cost>0&&booking?.ticket_id){
+    // DBから最新のチケット情報を取得してから戻す（メモリズレ防止）
+    const {data:latestTicket} = await sbClient.from('tickets').select('*').eq('id',booking.ticket_id).single();
+    if(latestTicket && latestTicket.plan_type !== 'unlimited'){
+      const diffH = (new Date(scheduledAt) - new Date()) / (1000 * 60 * 60);
+      if(diffH >= 12){
+        await sbClient.from('tickets').update({remaining_count: latestTicket.remaining_count + booking.menus.ticket_cost}).eq('id', latestTicket.id);
+      }
     }
   }
+  // currentCustomerを再取得してメモリを最新に同期
+  const {data: refreshed} = await sbClient.from('customers').select('*, tickets(*)').eq('id', currentCustomer.id).single();
+  if(refreshed){ currentCustomer = refreshed; currentTicket = refreshed.tickets?.find(t=>{const td=new Date().toISOString().slice(0,10);return(!t.valid_from||t.valid_from<=td)&&(!t.expires_at||t.expires_at>=td)&&(t.plan_type==='unlimited'||t.remaining_count>0);}) || refreshed.tickets?.[0] || null; }
   await loadMyBookings();
 }
 
