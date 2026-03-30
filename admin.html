@@ -537,7 +537,7 @@ function renderClients() {
       <td style="font-size:12px;color:#888;">${expiry}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn-sm" style="margin-right:4px;" onclick="openEditNameModal('${c.id}','${c.name}')">名前変更</button>
-        <button class="btn btn-sm" style="margin-right:4px;" onclick="openTicketModal('${c.id}','${ticket?.id||''}',${JSON.stringify(ticket||null).replace(/"/g,'&quot;')})">チケット</button>
+        <button class="btn btn-sm" style="margin-right:4px;" onclick="openTicketModal('${c.id}','',null)">＋チケット追加</button>
         <button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}','${c.name}')">削除</button>
       </td>
     </tr>`;
@@ -780,7 +780,7 @@ async function loadDashboard() {
         <td><span class="badge ${ticket.plan_type==='unlimited'?'badge-green':ticket.plan_type==='8'?'badge-blue':'badge-amber'}">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}</span></td>
         <td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${pct<=20?'bar-red':'bar-amber'}" style="width:${pct}%"></div></div><div class="bar-text">${ticket.remaining_count} / ${ticket.total_count}</div></div></td>
         <td style="font-size:12px;color:#888;">${ticket.valid_from||''}〜${ticket.expires_at||'—'}</td>
-        <td><button class="btn btn-sm" onclick="openTicketModal('${c.id}','${ticket.id}',${JSON.stringify(ticket).replace(/"/g,'&quot;')})">チケット追加</button></td>
+        <td><button class="btn btn-sm" onclick="openTicketModal('${c.id}','',null)">＋チケット追加</button></td>
       </tr>`;
     }
     html += '</tbody></table>';
