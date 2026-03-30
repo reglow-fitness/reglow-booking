@@ -239,6 +239,11 @@
 
 <script>
 const SUPABASE_URL = 'https://plapbyvgthymszrzbsgl.supabase.co';
+const PLAN_NAMES = {
+  '4': 'ライトプラン（月4回）',
+  '8': 'レギュラープラン（月8回）',
+  'unlimited': 'プレミアムプラン（無制限）'
+};
 const SUPABASE_KEY = 'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
 const LIFF_ID = '2009580897-CDVPk98y';
 
@@ -296,12 +301,12 @@ function renderHome() {
     const isUnlimited = currentTicket.plan_type === 'unlimited';
     const periodStr = currentTicket.valid_from ? `${currentTicket.valid_from} 〜 ${currentTicket.expires_at||'未設定'}` : (currentTicket.expires_at || '未設定');
     if (isUnlimited) {
-      ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">無制限プラン</div><div class="ticket-count-row"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+      ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
     } else {
       const r = currentTicket.remaining_count, t = currentTicket.total_count;
       const pct = Math.round((r/t)*100);
       const bc = pct > 50 ? '#06C755' : pct > 20 ? '#f0a500' : '#e74c3c';
-      ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${currentTicket.total_count}回券</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-bar-bg"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+      ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-bar-bg"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
     }
   } else {
     ta.innerHTML = `<div class="ticket-block"><div class="no-ticket">チケットが設定されていません<br>スタッフにお問い合わせください</div></div>`;
@@ -345,7 +350,7 @@ async function renderMenuSelect() {
 
     if (isSemi) {
       if (!hasTicket) { disabled = true; disabledReason = 'チケットが必要です'; badgeText = 'チケット必要'; badgeClass = 'badge-red'; }
-      else { badgeText = '残' + currentTicket.remaining_count + '回'; badgeClass = 'badge-green'; }
+      else if(currentTicket.plan_type === 'unlimited') { badgeText = 'プレミアム'; badgeClass = 'badge-green'; } else { badgeText = '残' + currentTicket.remaining_count + '回'; badgeClass = 'badge-green'; }
     } else {
       if (!isRegistered) { disabled = true; disabledReason = '顧客登録が必要です'; badgeText = '要登録'; badgeClass = 'badge-red'; }
       else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
@@ -684,12 +689,12 @@ function renderTicketDetail(){
   const isUnlimitedDetail = currentTicket.plan_type === 'unlimited';
   const periodStr2 = currentTicket.valid_from ? `${currentTicket.valid_from} 〜 ${currentTicket.expires_at||'未設定'}` : (currentTicket.expires_at || '未設定');
   if(isUnlimitedDetail){
-    el.innerHTML=`<div class="home-greeting" style="margin:12px;"><div class="ticket-type-label">無制限プラン</div><div class="ticket-count-row" style="margin-top:8px;"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div style="display:flex;justify-content:space-between;margin-top:12px;"><div style="font-size:13px;color:#888;">有効期間</div><div style="font-size:13px;font-weight:600;">${periodStr2}</div></div><div style="margin-top:12px;background:#e8f9ef;border-radius:10px;padding:10px;font-size:12px;color:#0a7a4a;">キャンセルペナルティはありません</div></div>`;
+    el.innerHTML=`<div class="home-greeting" style="margin:12px;"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row" style="margin-top:8px;"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div style="display:flex;justify-content:space-between;margin-top:12px;"><div style="font-size:13px;color:#888;">有効期間</div><div style="font-size:13px;font-weight:600;">${periodStr2}</div></div><div style="margin-top:12px;background:#e8f9ef;border-radius:10px;padding:10px;font-size:12px;color:#0a7a4a;">キャンセルペナルティはありません</div></div>`;
   } else {
     const r=currentTicket.remaining_count,t=currentTicket.total_count;
     const pct=Math.round((r/t)*100);
     const bc=pct>50?'#06C755':pct>20?'#f0a500':'#e74c3c';
-    el.innerHTML=`<div class="home-greeting" style="margin:12px;"><div class="ticket-type-label">${t}回券</div><div class="ticket-count-row" style="margin-top:8px;"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span><span style="font-size:13px;color:#aaa;margin-left:8px;">/ ${t}回</span></div><div class="ticket-bar-bg" style="margin-top:12px;"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div style="display:flex;justify-content:space-between;margin-top:12px;"><div style="font-size:13px;color:#888;">有効期間</div><div style="font-size:13px;font-weight:600;">${periodStr2}</div></div>${r<=3?'<div style="margin-top:14px;background:#fff8e1;border-radius:10px;padding:10px;font-size:12px;color:#8a6000;">残り回数が少なくなっています。<br>スタッフにチケットの更新をご相談ください。</div>':''}</div>`;
+    el.innerHTML=`<div class="home-greeting" style="margin:12px;"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row" style="margin-top:8px;"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span><span style="font-size:13px;color:#aaa;margin-left:8px;">/ ${t}回</span></div><div class="ticket-bar-bg" style="margin-top:12px;"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div style="display:flex;justify-content:space-between;margin-top:12px;"><div style="font-size:13px;color:#888;">有効期間</div><div style="font-size:13px;font-weight:600;">${periodStr2}</div></div>${r<=3?'<div style="margin-top:14px;background:#fff8e1;border-radius:10px;padding:10px;font-size:12px;color:#8a6000;">残り回数が少なくなっています。<br>スタッフにチケットの更新をご相談ください。</div>':''}</div>`;
   }
 }
 
