@@ -806,8 +806,8 @@ async function renderWeekCalendar() {
 
   const { data: bookings } = await sbClient.from('bookings')
     .select('*, customers(name), menus(name,ticket_cost)')
-    .gte('scheduled_at', currentWeekStart.toISOString())
-    .lte('scheduled_at', weekEnd.toISOString())
+    .gte('scheduled_at', toLocalDateStr(currentWeekStart) + 'T00:00:00')
+    .lte('scheduled_at', toLocalDateStr(weekEnd) + 'T23:59:59')
     .eq('status','confirmed')
     .order('scheduled_at', { ascending: true });
 
@@ -1166,6 +1166,14 @@ async function loadDashboard() {
   }
 }
 
+// ========== 日付ユーティリティ ==========
+function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // ========== 予約枠週間カレンダー ==========
 let slotWeekStart = null;
 
@@ -1205,8 +1213,8 @@ async function renderSlotWeekCalendar() {
 
   // スロット設定取得
   const { data: slotSettings } = await sbClient.from('slot_settings').select('*')
-    .gte('date', slotWeekStart.toISOString().slice(0,10))
-    .lte('date', weekEnd.toISOString().slice(0,10));
+    .gte('date', toLocalDateStr(slotWeekStart))
+    .lte('date', toLocalDateStr(weekEnd));
   const { data: weeklySettings } = await sbClient.from('weekly_slot_settings').select('*');
 
   const dn = ['日','月','火','水','木','金','土'];
@@ -1226,7 +1234,7 @@ async function renderSlotWeekCalendar() {
     const isSun=d.getDay()===0, isSat=d.getDay()===6;
     const col=isSun?'#e06060':isSat?'#6090e0':'#333';
     // スロット設定確認
-    const ds = d.toISOString().slice(0,10);
+    const ds = toLocalDateStr(d);
     const ss = slotSettings?.find(s=>s.date===ds);
     const ws = weeklySettings?.find(w=>w.day_of_week===d.getDay());
     const isClosed = ss ? ss.is_closed : (ws ? ws.is_closed : false);
@@ -1245,7 +1253,7 @@ async function renderSlotWeekCalendar() {
     html += `<div style="padding:4px;font-size:11px;color:#aaa;text-align:right;border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:52px;display:flex;align-items:center;justify-content:flex-end;">${slot}</div>`;
     for(const d of days){
       const isToday = d.getTime()===today.getTime();
-      const ds = d.toISOString().slice(0,10);
+      const ds = toLocalDateStr(d);
       const ss = slotSettings?.find(s=>s.date===ds);
       const ws = weeklySettings?.find(w=>w.day_of_week===d.getDay());
       const isClosed = ss ? ss.is_closed : (ws ? ws.is_closed : false);
