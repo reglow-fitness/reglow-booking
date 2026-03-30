@@ -814,9 +814,22 @@ async function toggleTicketPanel(customerId, tr) {
       <span class="ticket-item-period">${periodStr}</span>
       <span class="ticket-item-count">${countStr}</span>
       ${statusLabel}
+      <button class="btn btn-sm btn-danger" style="margin-left:8px;" onclick="deleteTicket('${t.id}','${customerId}')">削除</button>
     </div>`;
   }
   panelInner.innerHTML = html;
+}
+
+// ========== チケット削除 ==========
+async function deleteTicket(ticketId, customerId) {
+  if (!confirm('このチケットを削除しますか？')) return;
+  const { error } = await sbClient.from('tickets').delete().eq('id', ticketId);
+  if (error) { showToast('削除に失敗しました'); return; }
+  showToast('チケットを削除しました');
+  await loadCustomers();
+  // パネルを再表示
+  const panelRow = document.getElementById('ticket-panel-' + customerId);
+  if (panelRow) panelRow.style.display = 'none';
 }
 
 // ========== ダッシュボード ==========
