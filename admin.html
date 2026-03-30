@@ -103,6 +103,21 @@
     .toast { position: fixed; bottom: 24px; right: 24px; background: #111; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 13px; z-index: 9999; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; }
     .toast.show { opacity: 1; transform: translateY(0); }
 
+    /* ========== チケット一覧パネル ========== */
+    .ticket-panel { background: #f8fffe; border: 1px solid #d0f0e0; border-radius: 10px; padding: 14px 16px; margin-top: 8px; }
+    .ticket-panel-title { font-size: 12px; font-weight: 600; color: #0a7a4a; margin-bottom: 10px; }
+    .ticket-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #eef8f3; font-size: 12px; }
+    .ticket-item:last-child { border-bottom: none; }
+    .ticket-item-badge { flex-shrink: 0; }
+    .ticket-item-period { color: #555; flex: 1; }
+    .ticket-item-count { font-weight: 600; color: #111; min-width: 48px; text-align: right; }
+    .ticket-item-status { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 600; flex-shrink: 0; }
+    .status-active { background: #e6f7ee; color: #0a7a4a; }
+    .status-future { background: #e8f1fc; color: #1a56a0; }
+    .status-expired { background: #f0f0f0; color: #aaa; }
+    .row-clickable { cursor: pointer; }
+    .row-clickable:hover td { background: #f0fdf4 !important; }
+
     /* ========== ローディング ========== */
     .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
 
@@ -535,7 +550,7 @@ function renderClients() {
     const periodStart = ticket?.valid_from ? ticket.valid_from : null;
     const periodEnd = ticket?.expires_at ? ticket.expires_at.slice(0,10) : null;
     const expiry = periodStart ? `${periodStart} 〜 ${periodEnd||'未設定'}` : (periodEnd || '—');
-    html += `<tr>
+    html += `<tr class="row-clickable" onclick="toggleTicketPanel('${c.id}', this)">
       <td><div class="name-cell">
         <div class="avatar" style="background:${bg};color:${fg};">${getInitials(c.name)}</div>
         ${c.name}
@@ -543,10 +558,15 @@ function renderClients() {
       <td>${planBadge}</td>
       <td>${ticket ? (ticket.plan_type === 'unlimited' ? '<span class="badge badge-green">∞ 無制限</span>' : `<div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${barClass}" style="width:${pct}%"></div></div><div class="bar-text">${remaining} / ${total}</div></div>`) : '—'}</td>
       <td style="font-size:12px;color:#888;">${expiry}</td>
-      <td style="white-space:nowrap;">
+      <td style="white-space:nowrap;" onclick="event.stopPropagation()">
         <button class="btn btn-sm" style="margin-right:4px;" onclick="openEditNameModal('${c.id}','${c.name}')">名前変更</button>
         <button class="btn btn-sm" style="margin-right:4px;" onclick="openTicketModal('${c.id}','',null)">＋チケット追加</button>
         <button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}','${c.name}')">削除</button>
+      </td>
+    </tr>
+    <tr id="ticket-panel-${c.id}" style="display:none;">
+      <td colspan="5" style="padding:4px 12px 12px;">
+        <div class="ticket-panel" id="ticket-panel-inner-${c.id}">読み込み中...</div>
       </td>
     </tr>`;
   }
@@ -758,6 +778,45 @@ async function addBooking() {
   closeModal('modal-add-booking');
   showToast('予約を追加しました');
   await loadAll();
+}
+
+// ========== チケットパネル ==========
+async function toggleTicketPanel(customerId, tr) {
+  const panelRow = document.getElementById('ticket-panel-' + customerId);
+  const panelInner = document.getElementById('ticket-panel-inner-' + customerId);
+  if (panelRow.style.display !== 'none') {
+    panelRow.style.display = 'none';
+    return;
+  }
+  panelRow.style.display = '';
+  // 該当顧客のチケット全件取得
+  const { data: tickets } = await sbClient.from('tickets')
+    .select('*').eq('customer_id', customerId)
+    .order('valid_from', { ascending: true });
+  if (!tickets || tickets.length === 0) {
+    panelInner.innerHTML = '<div style="font-size:13px;color:#aaa;text-align:center;padding:8px;">チケットがありません</div>';
+    return;
+  }
+  const todayStr = new Date().toISOString().slice(0,10);
+  let html = '<div class="ticket-panel-title">🎫 チケット一覧</div>';
+  for (const t of tickets) {
+    const isActive = (!t.valid_from || t.valid_from <= todayStr) && (!t.expires_at || t.expires_at >= todayStr);
+    const isFuture = t.valid_from && t.valid_from > todayStr;
+    const isExpired = t.expires_at && t.expires_at < todayStr;
+    const statusLabel = isActive ? '<span class="ticket-item-status status-active">有効</span>'
+      : isFuture ? '<span class="ticket-item-status status-future">予定</span>'
+      : '<span class="ticket-item-status status-expired">期限切れ</span>';
+    const planBadgeClass = t.plan_type === 'unlimited' ? 'badge-green' : t.plan_type === '8' ? 'badge-blue' : 'badge-amber';
+    const countStr = t.plan_type === 'unlimited' ? '∞' : `${t.remaining_count} / ${t.total_count}回`;
+    const periodStr = (t.valid_from || '—') + ' 〜 ' + (t.expires_at || '—');
+    html += `<div class="ticket-item">
+      <span class="badge ${planBadgeClass} ticket-item-badge">${PLAN_NAMES[t.plan_type]||t.plan_type}</span>
+      <span class="ticket-item-period">${periodStr}</span>
+      <span class="ticket-item-count">${countStr}</span>
+      ${statusLabel}
+    </div>`;
+  }
+  panelInner.innerHTML = html;
 }
 
 // ========== ダッシュボード ==========
