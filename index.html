@@ -514,8 +514,14 @@ async function renderTimeSlots(ds) {
     }
 
     const isSel = selectedTime===slot;
+    // セミパーソナルの場合だけ残り枠数を表示
+    let remainLabel = '';
+    if(isSemiMenu && !isFull){
+      const remain = slotSemiMax - semiCount;
+      remainLabel = `<span style="font-size:10px;opacity:0.75;margin-left:3px;">残${remain}</span>`;
+    }
     if(isFull) html+=`<div class="time-slot full">${slot}</div>`;
-    else html+=`<div class="time-slot${isSel?' selected':''}" onclick="selectTime('${slot}')">${slot}</div>`;
+    else html+=`<div class="time-slot${isSel?' selected':''}" onclick="selectTime('${slot}')">${slot}${remainLabel}</div>`;
   }
   document.getElementById('time-slots').innerHTML=html;
   document.getElementById('time-section').style.display='block';
