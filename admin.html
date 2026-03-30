@@ -833,12 +833,17 @@ async function toggleTicketPanel(customerId, tr) {
     const planBadgeClass = t.plan_type === 'unlimited' ? 'badge-green' : t.plan_type === '8' ? 'badge-blue' : 'badge-amber';
     const countStr = t.plan_type === 'unlimited' ? '∞' : `${t.remaining_count} / ${t.total_count}回`;
     const periodStr = (t.valid_from || '—') + ' 〜 ' + (t.expires_at || '—');
+    const canDecrement = t.plan_type !== 'unlimited' && t.remaining_count > 0;
+    const decrementBtn = canDecrement
+      ? `<button class="btn btn-sm" style="margin-left:8px;font-weight:600;min-width:36px;" onclick="decrementTicket('${t.id}','${customerId}',${t.remaining_count})">−1</button>`
+      : '';
     html += `<div class="ticket-item">
       <span class="badge ${planBadgeClass} ticket-item-badge">${PLAN_NAMES[t.plan_type]||t.plan_type}</span>
       <span class="ticket-item-period">${periodStr}</span>
       <span class="ticket-item-count">${countStr}</span>
       ${statusLabel}
-      <button class="btn btn-sm btn-danger" style="margin-left:8px;" onclick="deleteTicket('${t.id}','${customerId}')">削除</button>
+      ${decrementBtn}
+      <button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="deleteTicket('${t.id}','${customerId}')">削除</button>
     </div>`;
   }
   panelInner.innerHTML = html;
@@ -903,6 +908,20 @@ async function executeBulkTicket() {
   closeModal('modal-bulk-ticket');
   showToast(`${successCount}名にチケットを付与しました`);
   await loadCustomers();
+}
+
+// ========== 残回数を1減らす ==========
+async function decrementTicket(ticketId, customerId, currentRemaining) {
+  if (!confirm(`残回数を ${currentRemaining} → ${currentRemaining - 1} に変更しますか？`)) return;
+  const { error } = await sbClient.from('tickets')
+    .update({ remaining_count: currentRemaining - 1 })
+    .eq('id', ticketId);
+  if (error) { showToast('更新に失敗しました'); return; }
+  showToast('残回数を1減らしました');
+  await loadCustomers();
+  // パネルを再表示
+  const panelRow = document.getElementById('ticket-panel-' + customerId);
+  if (panelRow) panelRow.style.display = 'none';
 }
 
 // ========== チケット削除 ==========
