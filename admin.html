@@ -514,8 +514,16 @@ function renderClients() {
     return;
   }
   let html = '<table><thead><tr><th>顧客名</th><th>プラン</th><th>残回数</th><th>有効期限</th><th>操作</th></tr></thead><tbody>';
+  const todayStr = new Date().toISOString().slice(0,10);
   for (const c of list) {
-    const ticket = c.tickets?.[0];
+    // 有効期間内のチケットを優先、なければ直近の将来チケット、なければ最新
+    const activeTicket = c.tickets?.find(t =>
+      (!t.valid_from || t.valid_from <= todayStr) &&
+      (!t.expires_at || t.expires_at >= todayStr)
+    );
+    const futureTicket = c.tickets?.filter(t => t.valid_from > todayStr)
+      .sort((a,b) => a.valid_from.localeCompare(b.valid_from))[0];
+    const ticket = activeTicket || futureTicket || c.tickets?.[c.tickets.length-1];
     const [bg, fg] = getAvatarColor(c.name);
     const remaining = ticket?.remaining_count ?? 0;
     const total = ticket?.total_count ?? 1;

@@ -283,7 +283,18 @@ async function loadCustomer() {
   const { data } = await sbClient.from('customers').select('*, tickets(*)').eq('line_user_id', lineProfile.userId);
   if (data && data.length > 0) {
     currentCustomer = data[0];
-    currentTicket = currentCustomer.tickets?.find(t => t.plan_type === 'unlimited' || t.remaining_count > 0) || currentCustomer.tickets?.[0] || null;
+    const todayStr = new Date().toISOString().slice(0,10);
+    // 1. 今日有効なチケット（valid_from<=today<=expires_at）
+    const activeTicket = currentCustomer.tickets?.find(t =>
+      (t.plan_type === 'unlimited' || t.remaining_count > 0) &&
+      (!t.valid_from || t.valid_from <= todayStr) &&
+      (!t.expires_at || t.expires_at >= todayStr)
+    );
+    // 2. 将来のチケット（開始日が最も近いもの）
+    const futureTicket = currentCustomer.tickets?.filter(t =>
+      t.valid_from && t.valid_from > todayStr
+    ).sort((a,b) => a.valid_from.localeCompare(b.valid_from))[0];
+    currentTicket = activeTicket || futureTicket || currentCustomer.tickets?.[0] || null;
   } else {
     const { data: newC } = await sbClient.from('customers').insert({ name: lineProfile.displayName, line_user_id: lineProfile.userId }).select('*, tickets(*)').single();
     currentCustomer = newC;
