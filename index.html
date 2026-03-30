@@ -490,8 +490,9 @@ async function renderTimeSlots(ds) {
       return bh === parseInt(h);
     });
 
-    const semiCount = slotBookings.filter(b=>b.menus?.ticket_cost>0).length;
-    const personalCount = slotBookings.filter(b=>b.menus?.ticket_cost===0&&b.menus?.max_per_slot===1).length;
+    // メニュー分類: A=セミパーソナル(ticket_cost>0), B=パーソナル体験(max_per_slot===1), C=自主トレ(それ以外)
+    const personalCount = slotBookings.filter(b=>b.menus?.max_per_slot===1).length;
+    const semiCount = slotBookings.filter(b=>b.menus?.ticket_cost>0 && b.menus?.max_per_slot!==1).length;
     const jiCount = slotBookings.filter(b=>b.menus?.ticket_cost===0&&b.menus?.max_per_slot>1).length;
     const totalCount = slotBookings.length;
 
