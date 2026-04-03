@@ -412,7 +412,7 @@ function renderCalendar() {
     const isToday=date.getTime()===today.getTime();
     const isPast=date<today;
     const isSel=selectedDate===ds;
-    const hasSlot=[1,2,3,4,5,6].includes(date.getDay())&&!isPast;
+    const hasSlot=!isPast; // 実際の枠はselectDate時にチェック
     let cls='cal-cell';
     if(isPast)cls+=' past';
     else if(isSel)cls+=' selected';
@@ -481,7 +481,14 @@ async function renderTimeSlots(ds) {
     document.getElementById('cal-next-btn').style.display = 'none';
     return;
   }
-  const activeSlots = availableSlots && availableSlots.length > 0 ? availableSlots : slots;
+  // 設定が存在しない日は受付なし
+  if (!slotSetting && !weeklySetting) {
+    document.getElementById('time-slots').innerHTML = '<div style="color:#aaa;font-size:13px;">この日は予約を受け付けていません</div>';
+    document.getElementById('time-section').style.display = 'block';
+    document.getElementById('cal-next-btn').style.display = 'none';
+    return;
+  }
+  const activeSlots = availableSlots && availableSlots.length > 0 ? availableSlots : [];
   let html = '';
   for(const slot of activeSlots){
     const [h] = slot.split(':');
