@@ -670,19 +670,16 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
   } else {
     if(!confirm('この予約をキャンセルしますか？'))return;
   }
-  const {data:booking}=await sbClient.from('bookings').select('*,menus(ticket_cost)').eq('id',id).single();
+  const {data:booking}=await sbClient.from('bookings').select('*,menus(ticket_cost),gcal_event_id').eq('id',id).single();
+  // Googleカレンダーから先に削除（event_idが取れているうちに）
+  if(booking?.gcal_event_id){
+    fetch('https://script.google.com/macros/s/AKfycbxuRunfusrWTJtp_KIEri78ipRY2mHbsC80QR0HifiFdgLCqUCWWQYdYRDQ7MK2dDoU_g/exec', {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'},
+      body: JSON.stringify({action:'delete', eventId: booking.gcal_event_id})
+    }).catch(e=>console.log('GCal delete error:',e));
+  }
   await sbClient.from('bookings').update({status:'cancelled'}).eq('id',id);
-  // Googleカレンダーから削除
-  try {
-    const {data:bk} = await sbClient.from('bookings').select('gcal_event_id').eq('id',id).single();
-    if(bk?.gcal_event_id){
-      await fetch('https://script.google.com/macros/s/AKfycbxuRunfusrWTJtp_KIEri78ipRY2mHbsC80QR0HifiFdgLCqUCWWQYdYRDQ7MK2dDoU_g/exec', {
-        method: 'POST',
-        headers: {'Content-Type': 'text/plain'},
-        body: JSON.stringify({action:'delete', eventId: bk.gcal_event_id})
-      });
-    }
-  } catch(e) { console.log('GCal delete error:', e); }
   if(booking?.menus?.ticket_cost>0&&booking?.ticket_id){
     // DBから最新のチケット情報を取得してから戻す（メモリズレ防止）
     const {data:latestTicket} = await sbClient.from('tickets').select('*').eq('id',booking.ticket_id).single();
@@ -788,12 +785,13 @@ function goBack(){
   }
 }
 
-function goHome(){
+async function goHome(){
   screenHistory=[];selectedMenu=null;selectedDate=null;selectedTime=null;
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-home').classList.add('active');
   updateHeader('screen-home');
-  renderHome();
+  // 最新データを再取得してから描画（チケット残数を正確に反映）
+  await loadCustomer();
   window.scrollTo(0,0);
 }
 
