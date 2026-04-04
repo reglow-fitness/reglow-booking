@@ -693,6 +693,7 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
   await loadCustomer();
   await loadMyBookings();
   // ホームのチケット残数は goHome() 時に loadCustomer() で更新される
+  // ホームのチケット残数は goHome() 時に loadCustomer() で更新される
 }
 
 async function loadHistory(){
