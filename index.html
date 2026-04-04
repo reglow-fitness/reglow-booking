@@ -615,24 +615,22 @@ async function submitBooking(){
     status:'confirmed'
   }).select('id').single();
   if(error){btn.disabled=false;btn.textContent='予約を確定する';alert('予約に失敗しました。もう一度お試しください。');return;}
-  // Googleカレンダーへの登録はバックグラウンドで実行（IDを直接渡す）
-  const customerName = currentCustomer?.name || 'Unknown';
+  // GCal登録（バックグラウンド、完了画面は待たない）
   const newBookingId = newBooking?.id;
-  fetch('https://script.google.com/macros/s/AKfycbxuRunfusrWTJtp_KIEri78ipRY2mHbsC80QR0HifiFdgLCqUCWWQYdYRDQ7MK2dDoU_g/exec', {
-    method: 'POST',
-    headers: {'Content-Type': 'text/plain'},
-    body: JSON.stringify({
-      action: 'create',
-      bookingId: selectedMenu.id,
-      customerName: customerName,
-      menuName: selectedMenu.name,
-      startTime: dt.toISOString()
-    })
-  }).then(r=>r.json()).then(gcalData=>{
-    if(gcalData.eventId && newBookingId){
-      sbClient.from('bookings').update({gcal_event_id:gcalData.eventId}).eq('id',newBookingId);
-    }
-  }).catch(e=>console.log('GCal error:',e));
+  if(newBookingId){
+    (async()=>{
+      try{
+        const gcalRes = await fetch('https://script.google.com/macros/s/AKfycbxuRunfusrWTJtp_KIEri78ipRY2mHbsC80QR0HifiFdgLCqUCWWQYdYRDQ7MK2dDoU_g/exec',{
+          method:'POST', headers:{'Content-Type':'text/plain'},
+          body:JSON.stringify({action:'create', bookingId:newBookingId, customerName:currentCustomer?.name||'Unknown', menuName:selectedMenu.name, startTime:dt.toISOString()})
+        });
+        const gcalData = await gcalRes.json();
+        if(gcalData.eventId){
+          await sbClient.from('bookings').update({gcal_event_id:gcalData.eventId}).eq('id',newBookingId);
+        }
+      }catch(e){console.log('GCal error:',e);}
+    })();
+  }
   if(selectedMenu.ticket_cost>0&&currentTicket&&currentTicket.plan_type!=='unlimited'){
     const nr=currentTicket.remaining_count-selectedMenu.ticket_cost;
     await sbClient.from('tickets').update({remaining_count:nr}).eq('id',currentTicket.id);
@@ -680,20 +678,21 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
     }).catch(e=>console.log('GCal delete error:',e));
   }
   await sbClient.from('bookings').update({status:'cancelled'}).eq('id',id);
-  if(booking?.menus?.ticket_cost>0&&booking?.ticket_id){
-    // DBから最新のチケット情報を取得してから戻す（メモリズレ防止）
+  // チケット戻し: DBから直接取得して確実に処理
+  if(booking?.ticket_id){
     const {data:latestTicket} = await sbClient.from('tickets').select('*').eq('id',booking.ticket_id).single();
-    if(latestTicket && latestTicket.plan_type !== 'unlimited'){
+    if(latestTicket && latestTicket.plan_type !== 'unlimited' && latestTicket.total_count > 0){
       const diffH = (new Date(scheduledAt) - new Date()) / (1000 * 60 * 60);
       if(diffH >= 12){
-        await sbClient.from('tickets').update({remaining_count: latestTicket.remaining_count + booking.menus.ticket_cost}).eq('id', latestTicket.id);
+        const newRemaining = Math.min((latestTicket.remaining_count||0) + 1, latestTicket.total_count);
+        await sbClient.from('tickets').update({remaining_count: newRemaining}).eq('id', latestTicket.id);
       }
     }
   }
-  // currentCustomerを再取得してメモリを最新に同期
-  const {data: refreshed} = await sbClient.from('customers').select('*, tickets(*)').eq('id', currentCustomer.id).single();
-  if(refreshed){ currentCustomer = refreshed; currentTicket = refreshed.tickets?.find(t=>{const td=new Date().toISOString().slice(0,10);return(!t.valid_from||t.valid_from<=td)&&(!t.expires_at||t.expires_at>=td)&&(t.plan_type==='unlimited'||t.remaining_count>0);}) || refreshed.tickets?.[0] || null; }
+  // currentCustomerを再取得してホーム表示を更新
+  await loadCustomer();
   await loadMyBookings();
+  // ホームのチケット残数は goHome() 時に loadCustomer() で更新される
 }
 
 async function loadHistory(){
