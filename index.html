@@ -303,6 +303,19 @@ async function loadCustomer() {
   renderHome();
 }
 
+// ============================================================
+// ★★★ 追加：指定した日付に有効なチケットを返すヘルパー関数 ★★★
+// 「今日有効か」ではなく「予約日当日に有効か」で判定する
+// ============================================================
+function getTicketForDate(dateStr) {
+  const tickets = currentCustomer?.tickets || [];
+  return tickets.find(t =>
+    (t.plan_type === 'unlimited' || t.remaining_count > 0) &&
+    (!t.valid_from  || t.valid_from  <= dateStr) &&
+    (!t.expires_at  || t.expires_at  >= dateStr)
+  ) || null;
+}
+
 function renderHome() {
   document.getElementById('home-loading').style.display = 'none';
   document.getElementById('home-content').style.display = 'block';
@@ -344,15 +357,14 @@ async function renderMenuSelect() {
 
   for (const menu of allMenus) {
     const isSemi = menu.ticket_cost > 0;
-    const today = new Date(); today.setHours(0,0,0,0);
-    const ticketValid = currentTicket && (
-      currentTicket.plan_type === 'unlimited' || currentTicket.remaining_count > 0
-    ) && (
-      !currentTicket.valid_from || new Date(currentTicket.valid_from) <= today
-    ) && (
-      !currentTicket.expires_at || new Date(currentTicket.expires_at) >= today
-    );
-    const hasTicket = !!ticketValid;
+
+    // ★★★ 修正①：今日有効かではなく「今日以降に有効なチケットが1枚でもあるか」で判定 ★★★
+    const todayStr = new Date().toISOString().slice(0,10);
+    const hasTicket = !!(currentCustomer?.tickets?.some(t =>
+      (t.plan_type === 'unlimited' || t.remaining_count > 0) &&
+      (!t.expires_at || t.expires_at >= todayStr)
+    ));
+
     const isRegistered = !!currentCustomer;
     let disabled = false;
     let badgeText = '';
@@ -361,7 +373,8 @@ async function renderMenuSelect() {
 
     if (isSemi) {
       if (!hasTicket) { disabled = true; disabledReason = 'チケットが必要です'; badgeText = 'チケット必要'; badgeClass = 'badge-red'; }
-      else if(currentTicket.plan_type === 'unlimited') { badgeText = 'プレミアム'; badgeClass = 'badge-green'; } else { badgeText = '残' + currentTicket.remaining_count + '回'; badgeClass = 'badge-green'; }
+      else if(currentTicket?.plan_type === 'unlimited') { badgeText = 'プレミアム'; badgeClass = 'badge-green'; }
+      else { badgeText = '残' + currentTicket.remaining_count + '回'; badgeClass = 'badge-green'; }
     } else {
       if (!isRegistered) { disabled = true; disabledReason = '顧客登録が必要です'; badgeText = '要登録'; badgeClass = 'badge-red'; }
       else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
@@ -412,7 +425,7 @@ function renderCalendar() {
     const isToday=date.getTime()===today.getTime();
     const isPast=date<today;
     const isSel=selectedDate===ds;
-    const hasSlot=!isPast; // 実際の枠はselectDate時にチェック
+    const hasSlot=!isPast;
     let cls='cal-cell';
     if(isPast)cls+=' past';
     else if(isSel)cls+=' selected';
@@ -444,7 +457,6 @@ async function selectDate(ds){
 
 async function renderTimeSlots(ds) {
   const slots = ['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
-  // 日付指定の上書き設定を確認、なければ週間テンプレートを確認
   const { data: slotSetting } = await sbClient.from('slot_settings').select('*').eq('date', ds).single();
   const dow = new Date(ds).getDay();
   const { data: weeklySetting } = await sbClient.from('weekly_slot_settings').select('*').eq('day_of_week', dow).single();
@@ -481,7 +493,6 @@ async function renderTimeSlots(ds) {
     document.getElementById('cal-next-btn').style.display = 'none';
     return;
   }
-  // 設定が存在しない日は受付なし
   if (!slotSetting && !weeklySetting) {
     document.getElementById('time-slots').innerHTML = '<div style="color:#aaa;font-size:13px;">この日は予約を受け付けていません</div>';
     document.getElementById('time-section').style.display = 'block';
@@ -497,7 +508,6 @@ async function renderTimeSlots(ds) {
       return bh === parseInt(h);
     });
 
-    // メニュー分類: A=セミパーソナル(ticket_cost>0), B=パーソナル体験(max_per_slot===1), C=自主トレ(それ以外)
     const personalCount = slotBookings.filter(b=>b.menus?.max_per_slot===1).length;
     const semiCount = slotBookings.filter(b=>b.menus?.ticket_cost>0 && b.menus?.max_per_slot!==1).length;
     const jiCount = slotBookings.filter(b=>b.menus?.ticket_cost===0&&b.menus?.max_per_slot>1).length;
@@ -506,22 +516,18 @@ async function renderTimeSlots(ds) {
     let isFull = false;
     const slotSemiMax = semiMaxPerSlot[slot] || 2;
     if(isSemiMenu){
-      // セミパーソナル：パーソナルが入ったら不可、時間帯ごとの定員まで
       if(personalCount > 0) isFull = true;
       if(semiCount + jiCount >= slotSemiMax * 2) isFull = true;
       if(semiCount >= slotSemiMax) isFull = true;
     } else if(isPersonalMenu){
-      // パーソナル（体験）：セミが1名でも入ったら不可
       if(semiCount > 0) isFull = true;
       if(personalCount >= 1) isFull = true;
     } else {
-      // 自主トレ：Bがいても予約可（C2名まで）、A+C合計4名まで
       if(jiCount >= 2) isFull = true;
       if(semiCount + jiCount >= 4) isFull = true;
     }
 
     const isSel = selectedTime===slot;
-    // セミパーソナルの場合だけ残り枠数を表示
     let remainLabel = '';
     if(isSemiMenu && !isFull){
       const remain = slotSemiMax - semiCount;
@@ -549,14 +555,16 @@ function renderConfirm(){
   const dtStr=`${d.getMonth()+1}月${d.getDate()}日（${dn[d.getDay()]}）${selectedTime}`;
   document.getElementById('confirm-menu').textContent=selectedMenu.name;
   document.getElementById('confirm-datetime').textContent=dtStr;
-  const isUnlimitedTicket = currentTicket?.plan_type === 'unlimited';
+
+  // ★★★ 修正②：予約日に有効なチケットで残り回数を表示 ★★★
+  const bookingTicket = getTicketForDate(selectedDate);
+  const isUnlimitedTicket = bookingTicket?.plan_type === 'unlimited';
   if(selectedMenu.ticket_cost>0 && !isUnlimitedTicket){
-    const after=(currentTicket?.remaining_count||0)-selectedMenu.ticket_cost;
+    const after=(bookingTicket?.remaining_count||0)-selectedMenu.ticket_cost;
     document.getElementById('confirm-ticket').textContent=`${selectedMenu.ticket_cost}回消化 → 残り${after}回`;
   } else {
     document.getElementById('confirm-ticket').textContent = isUnlimitedTicket ? '消化なし（無制限プラン）' : '消化なし';
   }
-  // 12時間前警告の表示制御
   const warnEl = document.querySelector('.confirm-warn');
   if(warnEl) warnEl.style.display = (selectedMenu.ticket_cost>0 && !isUnlimitedTicket) ? '' : 'none';
 }
@@ -564,19 +572,23 @@ function renderConfirm(){
 async function submitBooking(){
   const btn=document.getElementById('confirm-submit-btn');
   btn.disabled=true;btn.textContent='送信中...';
+
+  // ★★★ 修正③：予約日に有効なチケットを使う ★★★
+  const bookingTicket = getTicketForDate(selectedDate);
+
   // チケット有効期間チェック
-  if(selectedMenu.ticket_cost > 0 && currentTicket){
+  if(selectedMenu.ticket_cost > 0 && bookingTicket){
     const bookingDate = new Date(selectedDate);
-    if(currentTicket.valid_from){
-      const vf = new Date(currentTicket.valid_from); vf.setHours(0,0,0,0);
+    if(bookingTicket.valid_from){
+      const vf = new Date(bookingTicket.valid_from); vf.setHours(0,0,0,0);
       if(bookingDate < vf){
         btn.disabled=false;btn.textContent='予約を確定する';
         alert('チケットの有効期間がまだ始まっていません。スタッフにお問い合わせください。');
         return;
       }
     }
-    if(currentTicket.expires_at){
-      const expiry = new Date(currentTicket.expires_at);
+    if(bookingTicket.expires_at){
+      const expiry = new Date(bookingTicket.expires_at);
       expiry.setHours(23,59,59,999);
       if(bookingDate > expiry){
         btn.disabled=false;btn.textContent='予約を確定する';
@@ -585,7 +597,7 @@ async function submitBooking(){
       }
     }
   }
-  // セミパーソナル（メニューA）は1日1回チェック
+  // セミパーソナルは1日1回チェック
   if(selectedMenu.ticket_cost > 0){
     const startOfDay = new Date(selectedDate+'T00:00:00');
     const endOfDay = new Date(selectedDate+'T23:59:59');
@@ -607,7 +619,7 @@ async function submitBooking(){
   dt.setHours(parseInt(h),parseInt(m),0,0);
   const {data:newBooking, error}=await sbClient.from('bookings').insert({
     customer_id:currentCustomer.id,
-    ticket_id:currentTicket?.id||null,
+    ticket_id:bookingTicket?.id||null,   // ★ 修正③
     menu_id:selectedMenu.id,
     menu_name:selectedMenu.name,
     scheduled_at:dt.toISOString(),
@@ -615,7 +627,7 @@ async function submitBooking(){
     status:'confirmed'
   }).select('id').single();
   if(error){btn.disabled=false;btn.textContent='予約を確定する';alert('予約に失敗しました。もう一度お試しください。');return;}
-  // GCal登録（バックグラウンド、完了画面は待たない）
+  // GCal登録（バックグラウンド）
   const newBookingId = newBooking?.id;
   if(newBookingId){
     (async()=>{
@@ -631,20 +643,25 @@ async function submitBooking(){
       }catch(e){console.log('GCal error:',e);}
     })();
   }
-  if(selectedMenu.ticket_cost>0&&currentTicket&&currentTicket.plan_type!=='unlimited'){
-    const nr=currentTicket.remaining_count-selectedMenu.ticket_cost;
-    await sbClient.from('tickets').update({remaining_count:nr}).eq('id',currentTicket.id);
+  // チケット残数を減らす
+  if(selectedMenu.ticket_cost>0 && bookingTicket && bookingTicket.plan_type!=='unlimited'){  // ★ 修正③
+    const nr=bookingTicket.remaining_count-selectedMenu.ticket_cost;
+    await sbClient.from('tickets').update({remaining_count:nr}).eq('id',bookingTicket.id);
     // DBから再取得してメモリを同期
     const {data: refreshed} = await sbClient.from('customers').select('*, tickets(*)').eq('id', currentCustomer.id).single();
-    if(refreshed){ currentCustomer = refreshed; currentTicket = refreshed.tickets?.find(t=>{const td=new Date().toISOString().slice(0,10);return(!t.valid_from||t.valid_from<=td)&&(!t.expires_at||t.expires_at>=td)&&(t.plan_type==='unlimited'||t.remaining_count>0);}) || refreshed.tickets?.[0] || null; }
+    if(refreshed){
+      currentCustomer = refreshed;
+      const todayStr = new Date().toISOString().slice(0,10);
+      currentTicket = refreshed.tickets?.find(t=>(!t.valid_from||t.valid_from<=todayStr)&&(!t.expires_at||t.expires_at>=todayStr)&&(t.plan_type==='unlimited'||t.remaining_count>0)) || refreshed.tickets?.[0] || null;
+    }
   }
   const dn=['日','月','火','水','木','金','土'];
   const d=new Date(selectedDate);
   const dtStr=`${d.getMonth()+1}月${d.getDate()}日（${dn[d.getDay()]}）${selectedTime}`;
   document.getElementById('done-menu').textContent=selectedMenu.name;
   document.getElementById('done-datetime').textContent=dtStr;
-  document.getElementById('done-remaining').textContent=currentTicket?(currentTicket.plan_type==='unlimited'?'無制限':currentTicket.remaining_count+'回'):'—';
-  try{liff.sendMessages([{type:'text',text:`✅ 予約確定\n📋 ${selectedMenu.name}\n📅 ${dtStr}\n${selectedMenu.ticket_cost>0?'🎫 残り'+currentTicket.remaining_count+'回\n':''}\n当日お待ちしております！`}]);}catch(e){}
+  document.getElementById('done-remaining').textContent=bookingTicket?(bookingTicket.plan_type==='unlimited'?'無制限':bookingTicket.remaining_count+'回'):'—';
+  try{liff.sendMessages([{type:'text',text:`✅ 予約確定\n📋 ${selectedMenu.name}\n📅 ${dtStr}\n${selectedMenu.ticket_cost>0?'🎫 残り'+bookingTicket.remaining_count+'回\n':''}\n当日お待ちしております！`}]);}catch(e){}
   btn.disabled=false;btn.textContent='予約を確定する';
   goScreen('screen-done');
 }
@@ -669,7 +686,6 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
     if(!confirm('この予約をキャンセルしますか？'))return;
   }
   const {data:booking}=await sbClient.from('bookings').select('*,menus(ticket_cost),gcal_event_id').eq('id',id).single();
-  // Googleカレンダーから先に削除（event_idが取れているうちに）
   if(booking?.gcal_event_id){
     fetch('https://script.google.com/macros/s/AKfycbxuRunfusrWTJtp_KIEri78ipRY2mHbsC80QR0HifiFdgLCqUCWWQYdYRDQ7MK2dDoU_g/exec', {
       method: 'POST',
@@ -678,7 +694,6 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
     }).catch(e=>console.log('GCal delete error:',e));
   }
   await sbClient.from('bookings').update({status:'cancelled'}).eq('id',id);
-  // チケット戻し: DBから直接取得して確実に処理
   if(booking?.ticket_id){
     const {data:latestTicket} = await sbClient.from('tickets').select('*').eq('id',booking.ticket_id).single();
     if(latestTicket && latestTicket.plan_type !== 'unlimited' && latestTicket.total_count > 0){
@@ -689,11 +704,8 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
       }
     }
   }
-  // currentCustomerを再取得してホーム表示を更新
   await loadCustomer();
   await loadMyBookings();
-  // ホームのチケット残数は goHome() 時に loadCustomer() で更新される
-  // ホームのチケット残数は goHome() 時に loadCustomer() で更新される
 }
 
 async function loadHistory(){
@@ -713,7 +725,6 @@ function renderTicketDetail(){
   if(!currentCustomer){el.innerHTML='<div class="loading">チケットが設定されていません<br>スタッフにお問い合わせください</div>';return;}
   const allTickets = currentCustomer.tickets || [];
   const todayStr = new Date().toISOString().slice(0,10);
-  // 有効中 + 予定のみ表示（期限切れは除外）
   const visibleTickets = allTickets.filter(t =>
     !t.expires_at || t.expires_at >= todayStr
   ).sort((a,b) => (a.valid_from||'').localeCompare(b.valid_from||''));
@@ -790,7 +801,6 @@ async function goHome(){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-home').classList.add('active');
   updateHeader('screen-home');
-  // 最新データを再取得してから描画（チケット残数を正確に反映）
   await loadCustomer();
   window.scrollTo(0,0);
 }
