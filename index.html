@@ -277,6 +277,11 @@ async function init() {
   const { data: menus } = await sbClient.from('menus').select('*').eq('is_active', true).order('sort_order');
   allMenus = menus || [];
   await loadCustomer();
+
+  // ★ リッチメニューから直接画面を開く（例: ?screen=my-bookings）
+  const params = new URLSearchParams(location.search);
+  const screen = params.get('screen');
+  if (screen) goScreen('screen-' + screen);
 }
 
 async function loadCustomer() {
