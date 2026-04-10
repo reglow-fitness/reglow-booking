@@ -87,31 +87,15 @@
     .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
     .settings-box { background: #fff9f0; border: 1px solid #f5dda0; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
     .settings-box p { font-size: 13px; color: #8a6000; line-height: 1.7; }
-
-    /* ★★★ 時間帯ブロック用スタイル ★★★ */
-    .slot-toggle-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-    .slot-toggle-btn {
-      padding: 8px 16px; border-radius: 99px; font-size: 13px; font-weight: 600;
-      cursor: pointer; border: 2px solid #b7e5cc; background: #e6f7ee; color: #0a7a4a;
-      transition: all 0.15s; user-select: none;
-    }
-    .slot-toggle-btn:hover { opacity: 0.85; }
-    .slot-toggle-btn.blocked {
-      background: #ffeaea; color: #c0392b; border-color: #f5c6c6;
-    }
-    .slot-toggle-btn.inactive {
-      background: #f5f5f5; color: #ccc; border-color: #e8e8e8; cursor: not-allowed;
-    }
-    .block-info-box {
-      background: #fff8e1; border: 1px solid #f5dda0; border-radius: 10px;
-      padding: 12px 14px; font-size: 12px; color: #8a6000; line-height: 1.7; margin-bottom: 14px;
-    }
   </style>
 </head>
 <body>
 <div class="layout">
   <div class="sidebar">
-    <div class="sidebar-logo"><h1>Re:GLOW FITNESS</h1><span>管理画面</span></div>
+    <div class="sidebar-logo">
+      <h1>Re:GLOW FITNESS</h1>
+      <span>管理画面</span>
+    </div>
     <nav>
       <a onclick="showPage('dashboard',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.8"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.8"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.8"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.8"/></svg>ダッシュボード</a>
       <a onclick="showPage('clients',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M2 14c0-3 2.686-4.5 6-4.5s6 1.5 6 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>顧客・チケット管理</a>
@@ -132,10 +116,16 @@
         <div class="metric"><div class="metric-label">今月の予約数</div><div class="metric-value" id="m-bookings">--</div></div>
       </div>
       <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><strong style="font-size:14px;">残数が少ない顧客</strong><a onclick="showPage('clients',document.querySelector('nav a:nth-child(2)'))" style="font-size:12px;color:#06C755;cursor:pointer;">全員見る →</a></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <strong style="font-size:14px;">残数が少ない顧客</strong>
+          <a onclick="showPage('clients',document.querySelector('nav a:nth-child(2)'))" style="font-size:12px;color:#06C755;cursor:pointer;">全員見る →</a>
+        </div>
         <div id="low-ticket-list"><div class="loading">読み込み中...</div></div>
       </div>
-      <div class="card"><strong style="font-size:14px;display:block;margin-bottom:14px;">直近の予約</strong><div id="recent-bookings"><div class="loading">読み込み中...</div></div></div>
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:14px;">直近の予約</strong>
+        <div id="recent-bookings"><div class="loading">読み込み中...</div></div>
+      </div>
     </div>
 
     <!-- 顧客・チケット管理 -->
@@ -180,7 +170,9 @@
         </div>
         <div class="card" style="padding:0;overflow-x:auto;"><div id="week-grid" style="min-width:700px;"></div></div>
       </div>
-      <div id="booking-list-view" style="display:none;"><div class="card" style="padding:0;"><div id="booking-list"><div class="loading">読み込み中...</div></div></div></div>
+      <div id="booking-list-view" style="display:none;">
+        <div class="card" style="padding:0;"><div id="booking-list"><div class="loading">読み込み中...</div></div></div>
+      </div>
     </div>
 
     <!-- 予約枠管理 -->
@@ -195,12 +187,13 @@
         </div>
       </div>
       <div class="card" style="padding:0;overflow-x:auto;"><div id="slot-week-grid" style="min-width:700px;"></div></div>
-      <!-- 凡例 -->
+
+      <!-- ★ 凡例（予約不可を追加） -->
       <div style="display:flex;gap:16px;padding:8px 4px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#e6f7ee;border:1px solid #b7e5cc;"></div>空きあり</div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#fff8e1;border:1px solid #f5dda0;"></div>残り少ない</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#e6f7ee;border:1px solid #b7e5cc;"></div>空きあり（タップで予約不可に）</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#fff8e1;border:1px solid #f5dda0;"></div>残り少ない（タップで予約不可に）</div>
         <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#ffeaea;border:1px solid #f5c6c6;"></div>満員</div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#f0e8ff;border:1px solid #d4b8f0;"></div>予約不可（手動ブロック）</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#f0e6ff;border:1px solid #d4b0f0;"></div>🚫 予約不可（タップで解除）</div>
         <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;"><div style="width:14px;height:14px;border-radius:3px;background:#f0f0f0;border:1px solid #ddd;"></div>受付なし</div>
       </div>
 
@@ -210,8 +203,6 @@
           <strong style="font-size:14px;">予約枠の詳細設定</strong>
           <button class="btn btn-sm" onclick="document.getElementById('slot-edit-panel').style.display='none'">✕ 閉じる</button>
         </div>
-
-        <!-- 週間テンプレート -->
         <div style="margin-bottom:20px;">
           <strong style="font-size:13px;display:block;margin-bottom:10px;color:#555;">週間テンプレート設定</strong>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;" id="weekly-day-tabs">
@@ -227,45 +218,30 @@
             <div id="weekly-checkboxes" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>
             <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px;"><input type="checkbox" id="weekly-is-closed"> この曜日は全休にする</label>
             <div style="margin-bottom:12px;">
-              <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:#555;">A（セミパーソナル）の定員（時間帯ごと）</div>
+              <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:#555;">A（セミパーソナル）の定員</div>
               <div id="weekly-semi-max-per-slot"></div>
             </div>
             <button class="btn btn-primary btn-sm" onclick="saveWeeklySlot()">保存する</button>
           </div>
           <input type="hidden" id="weekly-day-index">
         </div>
-
         <hr style="border:none;border-top:1px solid #f0f0f0;margin:16px 0;">
-
-        <!-- ★★★ 日付指定・時間帯ブロック ★★★ -->
         <div>
-          <strong style="font-size:13px;display:block;margin-bottom:4px;color:#555;">日付指定の上書き設定</strong>
-          <p style="font-size:12px;color:#888;margin-bottom:12px;">特定の日だけ時間帯をブロックしたい場合はここで設定します。日付を選ぶと週間テンプレートを自動で読み込みます。</p>
+          <strong style="font-size:13px;display:block;margin-bottom:10px;color:#555;">日付指定の上書き設定</strong>
           <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
-            <input type="date" class="form-input" id="slot-date" style="width:160px;" onchange="loadSlotSetting()">
+            <input type="date" class="form-input" id="slot-date" style="width:160px;">
+            <button class="btn btn-primary btn-sm" onclick="loadSlotSetting()">この日を設定</button>
           </div>
           <div id="slot-editor" style="display:none;">
-            <div class="block-info-box">
-              🗓 <strong id="slot-editor-date-label"></strong> の設定<br>
-              <span style="color:#06C755;font-weight:600;">✓ 緑 = 予約受付中</span>　<span style="color:#c0392b;font-weight:600;">🚫 赤 = 予約不可</span><br>
-              ボタンをクリックして予約不可に切り替えられます。
-            </div>
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px;" id="slot-closed-label">
-              <input type="checkbox" id="slot-is-closed" onchange="renderSlotToggleGrid()"> この日は全休にする
-            </label>
-            <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:#555;">時間帯ごとの設定（クリックで切り替え）</div>
-            <div class="slot-toggle-grid" id="slot-toggle-grid"></div>
+            <div id="slot-checkboxes" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px;"><input type="checkbox" id="slot-is-closed"> この日は全休にする</label>
             <div style="margin-bottom:12px;">
-              <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:#555;">A（セミパーソナル）の定員（時間帯ごと）</div>
+              <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:#555;">A（セミパーソナル）の定員</div>
               <div id="slot-semi-max-per-slot"></div>
             </div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <button class="btn btn-primary btn-sm" onclick="saveSlotSetting()">この日の設定を保存する</button>
-              <button class="btn btn-sm btn-danger" id="slot-reset-btn" style="display:none;" onclick="resetSlotSetting()">設定を削除（テンプレートに戻す）</button>
-            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveSlotSetting()">保存する</button>
           </div>
         </div>
-
         <hr style="border:none;border-top:1px solid #f0f0f0;margin:16px 0;">
         <div>
           <strong style="font-size:13px;display:block;margin-bottom:10px;color:#555;">設定済みの日程</strong>
@@ -282,7 +258,7 @@
     <div class="page active" id="page-settings">
       <div class="page-title">設定</div>
       <div class="card">
-        <div class="settings-box"><p>⚠️ 以下にSupabaseのURLとAPIキーを入力して「保存」を押してください。<br>一度保存するとブラウザに記憶されます。</p></div>
+        <div class="settings-box"><p>⚠️ 以下にSupabaseのURLとAPIキーを入力して「保存」を押してください。</p></div>
         <div class="form-row"><label class="form-label">Supabase URL</label><input class="form-input" id="setting-url" placeholder="https://xxxxxxxxxx.supabase.co"></div>
         <div class="form-row"><label class="form-label">Supabase Publishable Key</label><input class="form-input" id="setting-key" placeholder="sb_publishable_..."></div>
         <button class="btn btn-primary" onclick="saveSettings()">保存して接続</button>
@@ -301,40 +277,73 @@
     <div class="form-row"><label class="form-label">メモ</label><input class="form-input" id="add-memo" placeholder="任意"></div>
     <hr style="border:none;border-top:1px solid #f0f0f0;margin:16px 0;">
     <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:#555;">初回チケット設定</div>
-    <div class="form-row"><label class="form-label">プラン種別</label><select class="form-input" id="add-plan-type"><option value="4">ライトプラン（月4回）</option><option value="8">レギュラープラン（月8回）</option><option value="unlimited">プレミアムプラン（無制限）</option></select></div>
+    <div class="form-row"><label class="form-label">プラン種別</label>
+      <select class="form-input" id="add-plan-type">
+        <option value="4">ライトプラン（月4回）</option>
+        <option value="8">レギュラープラン（月8回）</option>
+        <option value="unlimited">プレミアムプラン（無制限）</option>
+      </select>
+    </div>
     <div class="form-row"><label class="form-label">有効開始日 *</label><input type="date" class="form-input" id="add-valid-from"></div>
     <div class="form-row"><label class="form-label">有効終了日 *</label><input type="date" class="form-input" id="add-expiry"></div>
-    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-add-client')">キャンセル</button><button class="btn btn-primary" onclick="addClient()">登録する</button></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add-client')">キャンセル</button>
+      <button class="btn btn-primary" onclick="addClient()">登録する</button>
+    </div>
   </div>
 </div>
+
 <div class="modal-overlay" id="modal-ticket" onclick="closeModalOutside(event,'modal-ticket')">
   <div class="modal">
     <div class="modal-title" id="ticket-modal-title">チケット設定</div>
-    <input type="hidden" id="ticket-customer-id"><input type="hidden" id="ticket-id">
-    <div class="form-row"><label class="form-label">プラン種別</label><select class="form-input" id="ticket-plan-type"><option value="4">ライトプラン（月4回）</option><option value="8">レギュラープラン（月8回）</option><option value="unlimited">プレミアムプラン（無制限）</option></select></div>
+    <input type="hidden" id="ticket-customer-id">
+    <input type="hidden" id="ticket-id">
+    <div class="form-row"><label class="form-label">プラン種別</label>
+      <select class="form-input" id="ticket-plan-type">
+        <option value="4">ライトプラン（月4回）</option>
+        <option value="8">レギュラープラン（月8回）</option>
+        <option value="unlimited">プレミアムプラン（無制限）</option>
+      </select>
+    </div>
     <div class="form-row"><label class="form-label">有効開始日 *</label><input type="date" class="form-input" id="ticket-valid-from"></div>
     <div class="form-row"><label class="form-label">有効終了日 *</label><input type="date" class="form-input" id="ticket-expiry"></div>
-    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-ticket')">キャンセル</button><button class="btn btn-primary" onclick="saveTicket()">保存する</button></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-ticket')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveTicket()">保存する</button>
+    </div>
   </div>
 </div>
+
 <div class="modal-overlay" id="modal-add-booking" onclick="closeModalOutside(event,'modal-add-booking')">
   <div class="modal">
     <div class="modal-title">予約追加</div>
     <div class="form-row"><label class="form-label">顧客 *</label><select class="form-input" id="booking-customer-id" onchange="loadCustomerTickets(this.value)"><option value="">選択してください</option></select></div>
     <div class="form-row"><label class="form-label">チケット</label><select class="form-input" id="booking-ticket-id"><option value="">顧客を先に選択</option></select></div>
     <div class="form-row"><label class="form-label">日時 *</label><input type="datetime-local" class="form-input" id="booking-datetime"></div>
-    <div class="form-row"><label class="form-label">時間（分）</label><select class="form-input" id="booking-duration"><option value="60">60分</option><option value="90">90分</option><option value="120">120分</option></select></div>
-    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-add-booking')">キャンセル</button><button class="btn btn-primary" onclick="addBooking()">予約を追加</button></div>
+    <div class="form-row"><label class="form-label">時間（分）</label>
+      <select class="form-input" id="booking-duration">
+        <option value="60">60分</option><option value="90">90分</option><option value="120">120分</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add-booking')">キャンセル</button>
+      <button class="btn btn-primary" onclick="addBooking()">予約を追加</button>
+    </div>
   </div>
 </div>
+
 <div class="modal-overlay" id="modal-edit-name" onclick="closeModalOutside(event,'modal-edit-name')">
   <div class="modal">
     <div class="modal-title">顧客名を変更</div>
     <input type="hidden" id="edit-name-customer-id">
     <div class="form-row"><label class="form-label">新しい名前 *</label><input class="form-input" id="edit-name-value" placeholder="例：田中 美咲"></div>
-    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-edit-name')">キャンセル</button><button class="btn btn-primary" onclick="saveCustomerName()">保存する</button></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-edit-name')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveCustomerName()">保存する</button>
+    </div>
   </div>
 </div>
+
 <div class="modal-overlay" id="modal-bulk-ticket" onclick="closeModalOutside(event,'modal-bulk-ticket')">
   <div class="modal" style="width:480px;">
     <div class="modal-title" id="bulk-modal-title">一括チケット付与</div>
@@ -342,81 +351,115 @@
     <div id="bulk-checkbox-list" style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:8px;margin-bottom:14px;"></div>
     <div class="form-row"><label class="form-label">有効開始日 *</label><input type="date" class="form-input" id="bulk-valid-from"></div>
     <div class="form-row"><label class="form-label">有効終了日 *</label><input type="date" class="form-input" id="bulk-expiry"></div>
-    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-bulk-ticket')">キャンセル</button><button class="btn btn-primary" onclick="executeBulkTicket()">選択した人に付与する</button></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-bulk-ticket')">キャンセル</button>
+      <button class="btn btn-primary" onclick="executeBulkTicket()">選択した人に付与する</button>
+    </div>
   </div>
 </div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-const PLAN_NAMES={'4':'ライトプラン（月4回）','8':'レギュラープラン（月8回）','unlimited':'プレミアムプラン（無制限）'};
-const PLAN_TYPES=Object.keys(PLAN_NAMES);
-const DEFAULT_SLOTS=['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
-const DAY_NAMES=['日','月','火','水','木','金','土'];
-const MENU_COLORS={A:{bg:'#e6f7ee',color:'#0a7a4a',border:'#b7e5cc'},B:{bg:'#e8f1fc',color:'#1a56a0',border:'#b3d0f5'},C:{bg:'#fff8e6',color:'#9a6800',border:'#f5dda0'}};
+const PLAN_NAMES = {'4':'ライトプラン（月4回）','8':'レギュラープラン（月8回）','unlimited':'プレミアムプラン（無制限）'};
+const PLAN_TYPES = Object.keys(PLAN_NAMES);
+const DEFAULT_SLOTS = ['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
+const DAY_NAMES = ['日','月','火','水','木','金','土'];
+const TIME_SLOTS = DEFAULT_SLOTS;
+const MENU_COLORS = {
+  'A':{bg:'#e6f7ee',color:'#0a7a4a',border:'#b7e5cc'},
+  'B':{bg:'#e8f1fc',color:'#1a56a0',border:'#b3d0f5'},
+  'C':{bg:'#fff8e6',color:'#9a6800',border:'#f5dda0'},
+};
 
-let sbClient=null,currentClientTab='all',allClients=[];
-// ★★★ 時間帯ブロック状態管理 ★★★
-let currentSlotWeeklyAvail=[];  // 週間テンプレートの受付スロット
-let currentSlotBlocked=[];      // ブロック中スロット
+let sbClient = null;
+let currentClientTab = 'all';
+let allClients = [];
+let currentBookingView = 'calendar';
+let currentWeekStart = null;
+let slotWeekStart = null;
 
-function initSupabase(){
-  const url=document.getElementById('setting-url').value.trim()||'https://plapbyvgthymszrzbsgl.supabase.co';
-  const key=document.getElementById('setting-key').value.trim()||'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
-  if(url&&key){sbClient=window.supabase.createClient(url,key);return true;}return false;
+function initSupabase() {
+  const url = document.getElementById('setting-url').value.trim() || 'https://plapbyvgthymszrzbsgl.supabase.co';
+  const key = document.getElementById('setting-key').value.trim() || 'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
+  if (url && key) { sbClient = window.supabase.createClient(url, key); return true; }
+  return false;
 }
-function saveSettings(){
-  const url=document.getElementById('setting-url').value.trim();
-  const key=document.getElementById('setting-key').value.trim();
-  if(!url||!key){showToast('URLとキーを入力してください');return;}
-  sbClient=window.supabase.createClient(url,key);
-  document.getElementById('setting-status').textContent='✅ 接続しました！';
+
+function saveSettings() {
+  const url = document.getElementById('setting-url').value.trim();
+  const key = document.getElementById('setting-key').value.trim();
+  if (!url || !key) { showToast('URLとキーを入力してください'); return; }
+  sbClient = window.supabase.createClient(url, key);
+  document.getElementById('setting-status').textContent = '✅ 接続しました！';
   showToast('接続しました！');
-  showPage('dashboard',document.querySelector('nav a:first-child'));
+  showPage('dashboard', document.querySelector('nav a:first-child'));
   loadAll();
 }
-function showPage(name,el){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
-  if(el)el.classList.add('active');
-  if(name==='clients')renderClients();
-  if(name==='bookings')loadBookings();
-  if(name==='dashboard')loadDashboard();
-  if(name==='slots')initSlotWeek();
+
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  if (name === 'clients') renderClients();
+  if (name === 'bookings') loadBookings();
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'slots') initSlotWeek();
 }
-function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
-function openModal(id){document.getElementById(id).classList.add('open');}
-function closeModal(id){document.getElementById(id).classList.remove('open');}
-function closeModalOutside(e,id){if(e.target.id===id)closeModal(id);}
-async function loadAll(){if(!sbClient)return;await loadCustomers();await loadDashboard();}
-async function loadCustomers(){
-  if(!sbClient)return;
-  const{data,error}=await sbClient.from('customers').select('*, tickets(*)').order('created_at',{ascending:false});
-  if(error){showToast('顧客データの読み込みに失敗しました');return;}
-  allClients=data||[];renderClients();
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
 }
-const avatarColors=[['#fff0e6','#c05000'],['#e6f9ef','#0a7a4a'],['#eeeeff','#4040cc'],['#fff0f6','#c0005a'],['#e8f1fc','#1a56a0'],['#fffbe6','#9a6800']];
-function getAvatarColor(name){return avatarColors[(name.charCodeAt(0)||0)%avatarColors.length];}
-function getInitials(name){return name?name.slice(0,2):'??';}
-function renderClients(){
-  const search=(document.getElementById('client-search')?.value||'').toLowerCase();
-  let list=allClients.filter(c=>c.name.toLowerCase().includes(search));
-  if(PLAN_TYPES.includes(currentClientTab))list=list.filter(c=>c.tickets?.some(t=>t.plan_type===currentClientTab));
-  if(currentClientTab==='low')list=list.filter(c=>c.tickets?.some(t=>t.plan_type!=='unlimited'&&t.remaining_count<=5));
-  if(list.length===0){document.getElementById('client-list').innerHTML='<div class="loading">顧客が見つかりません</div>';return;}
-  let html='<table><thead><tr><th>顧客名</th><th>プラン</th><th>残回数</th><th>有効期限</th><th>操作</th></tr></thead><tbody>';
-  const todayStr=new Date().toISOString().slice(0,10);
-  for(const c of list){
-    const activeTicket=c.tickets?.find(t=>(!t.valid_from||t.valid_from<=todayStr)&&(!t.expires_at||t.expires_at>=todayStr));
-    const futureTicket=c.tickets?.filter(t=>t.valid_from>todayStr).sort((a,b)=>a.valid_from.localeCompare(b.valid_from))[0];
-    const ticket=activeTicket||futureTicket||c.tickets?.[c.tickets.length-1];
-    const[bg,fg]=getAvatarColor(c.name);
-    const remaining=ticket?.remaining_count??0,total=ticket?.total_count??1;
-    const pct=Math.round((remaining/total)*100);
-    const barClass=pct>50?'bar-green':pct>20?'bar-amber':'bar-red';
-    const planBadge=ticket?`<span class="badge ${ticket.plan_type==='unlimited'?'badge-green':ticket.plan_type==='8'?'badge-blue':'badge-amber'}">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}</span>`:'<span class="badge badge-gray">未設定</span>';
-    const expiry=ticket?.valid_from?`${ticket.valid_from} 〜 ${ticket.expires_at?.slice(0,10)||'未設定'}`:(ticket?.expires_at||'—');
-    html+=`<tr class="row-clickable" onclick="toggleTicketPanel('${c.id}',this)">
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModalOutside(e, id) { if (e.target.id === id) closeModal(id); }
+function togglePlanFields(prefix) {}
+
+async function loadAll() {
+  if (!sbClient) return;
+  await loadCustomers();
+  await loadDashboard();
+}
+
+async function loadCustomers() {
+  if (!sbClient) return;
+  const { data, error } = await sbClient.from('customers').select('*, tickets(*)').order('created_at', { ascending: false });
+  if (error) { showToast('顧客データの読み込みに失敗しました'); return; }
+  allClients = data || [];
+  renderClients();
+}
+
+const avatarColors = [['#fff0e6','#c05000'],['#e6f9ef','#0a7a4a'],['#eeeeff','#4040cc'],['#fff0f6','#c0005a'],['#e8f1fc','#1a56a0'],['#fffbe6','#9a6800']];
+function getAvatarColor(name) { return avatarColors[(name.charCodeAt(0)||0) % avatarColors.length]; }
+function getInitials(name) { return name ? name.slice(0,2) : '??'; }
+
+function renderClients() {
+  const search = (document.getElementById('client-search')?.value || '').toLowerCase();
+  let list = allClients.filter(c => c.name.toLowerCase().includes(search));
+  if (PLAN_TYPES.includes(currentClientTab)) list = list.filter(c => c.tickets?.some(t => t.plan_type === currentClientTab));
+  if (currentClientTab === 'low') list = list.filter(c => c.tickets?.some(t => t.plan_type !== 'unlimited' && t.remaining_count <= 5));
+  if (list.length === 0) { document.getElementById('client-list').innerHTML = '<div class="loading">顧客が見つかりません</div>'; return; }
+  let html = '<table><thead><tr><th>顧客名</th><th>プラン</th><th>残回数</th><th>有効期限</th><th>操作</th></tr></thead><tbody>';
+  const todayStr = new Date().toISOString().slice(0,10);
+  for (const c of list) {
+    const activeTicket = c.tickets?.find(t => (!t.valid_from||t.valid_from<=todayStr)&&(!t.expires_at||t.expires_at>=todayStr));
+    const futureTicket = c.tickets?.filter(t=>t.valid_from>todayStr).sort((a,b)=>a.valid_from.localeCompare(b.valid_from))[0];
+    const ticket = activeTicket || futureTicket || c.tickets?.[c.tickets.length-1];
+    const [bg,fg] = getAvatarColor(c.name);
+    const remaining = ticket?.remaining_count ?? 0;
+    const total = ticket?.total_count ?? 1;
+    const pct = Math.round((remaining/total)*100);
+    const barClass = pct>50?'bar-green':pct>20?'bar-amber':'bar-red';
+    const planBadge = ticket ? `<span class="badge ${ticket.plan_type==='unlimited'?'badge-green':ticket.plan_type==='8'?'badge-blue':'badge-amber'}">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}</span>` : '<span class="badge badge-gray">未設定</span>';
+    const periodStart = ticket?.valid_from||null;
+    const periodEnd = ticket?.expires_at?.slice(0,10)||null;
+    const expiry = periodStart ? `${periodStart} 〜 ${periodEnd||'未設定'}` : (periodEnd||'—');
+    html += `<tr class="row-clickable" onclick="toggleTicketPanel('${c.id}',this)">
       <td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};">${getInitials(c.name)}</div>${c.name}</div></td>
       <td>${planBadge}</td>
       <td>${ticket?(ticket.plan_type==='unlimited'?'<span class="badge badge-green">∞ 無制限</span>':`<div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${barClass}" style="width:${pct}%"></div></div><div class="bar-text">${remaining} / ${total}</div></div>`):'—'}</td>
@@ -429,241 +472,286 @@ function renderClients(){
     </tr>
     <tr id="ticket-panel-${c.id}" style="display:none;"><td colspan="5" style="padding:4px 12px 12px;"><div class="ticket-panel" id="ticket-panel-inner-${c.id}">読み込み中...</div></td></tr>`;
   }
-  html+='</tbody></table>';
-  document.getElementById('client-list').innerHTML=html;
+  html += '</tbody></table>';
+  document.getElementById('client-list').innerHTML = html;
 }
-function filterClients(q){renderClients();}
-function setClientTab(tab,el){
-  currentClientTab=tab;
-  document.querySelectorAll('.tab-bar .tab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');renderClients();
-  document.getElementById('bulk-ticket-btn').style.display=PLAN_TYPES.includes(tab)?'':'none';
+
+function filterClients(q) { renderClients(); }
+function setClientTab(tab, el) {
+  currentClientTab = tab;
+  document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderClients();
+  const bulkBtn = document.getElementById('bulk-ticket-btn');
+  if(bulkBtn) bulkBtn.style.display = PLAN_TYPES.includes(tab) ? '' : 'none';
 }
-async function addClient(){
-  if(!sbClient){showToast('先に設定画面でSupabaseを設定してください');return;}
-  const name=document.getElementById('add-name').value.trim();
-  if(!name){showToast('氏名を入力してください');return;}
-  const{data:customer,error}=await sbClient.from('customers').insert({name,phone:document.getElementById('add-phone').value.trim(),memo:document.getElementById('add-memo').value.trim()}).select().single();
-  if(error){showToast('登録に失敗しました');return;}
-  const planType=document.getElementById('add-plan-type').value;
-  const total=planType==='unlimited'?null:parseInt(planType);
-  await sbClient.from('tickets').insert({customer_id:customer.id,plan_type:planType,total_count:total,remaining_count:total,valid_from:document.getElementById('add-valid-from').value||null,expires_at:document.getElementById('add-expiry').value||null});
+
+async function addClient() {
+  if (!sbClient) { showToast('先に設定画面でSupabaseを設定してください'); return; }
+  const name = document.getElementById('add-name').value.trim();
+  if (!name) { showToast('氏名を入力してください'); return; }
+  const phone = document.getElementById('add-phone').value.trim();
+  const memo = document.getElementById('add-memo').value.trim();
+  const { data: customer, error } = await sbClient.from('customers').insert({ name, phone, memo }).select().single();
+  if (error) { showToast('登録に失敗しました'); return; }
+  const planType = document.getElementById('add-plan-type').value;
+  const isUnlimited = planType === 'unlimited';
+  const total = isUnlimited ? null : parseInt(planType);
+  const validFrom = document.getElementById('add-valid-from').value || null;
+  const expiry = document.getElementById('add-expiry').value || null;
+  await sbClient.from('tickets').insert({ customer_id: customer.id, plan_type: planType, total_count: total, remaining_count: total, valid_from: validFrom, expires_at: expiry });
   closeModal('modal-add-client');
-  ['add-name','add-phone','add-memo'].forEach(id=>document.getElementById(id).value='');
-  showToast(`${name} さんを登録しました`);await loadCustomers();
+  document.getElementById('add-name').value=''; document.getElementById('add-phone').value=''; document.getElementById('add-memo').value='';
+  showToast(`${name} さんを登録しました`);
+  await loadCustomers();
 }
-function openEditNameModal(cid,name){document.getElementById('edit-name-customer-id').value=cid;document.getElementById('edit-name-value').value=name;openModal('modal-edit-name');}
-async function saveCustomerName(){
-  const cid=document.getElementById('edit-name-customer-id').value,name=document.getElementById('edit-name-value').value.trim();
-  if(!name){showToast('名前を入力してください');return;}
-  const{error}=await sbClient.from('customers').update({name}).eq('id',cid);
-  if(error){showToast('更新に失敗しました');return;}
-  closeModal('modal-edit-name');showToast('名前を更新しました');await loadCustomers();
+
+function openEditNameModal(customerId, currentName) {
+  document.getElementById('edit-name-customer-id').value = customerId;
+  document.getElementById('edit-name-value').value = currentName;
+  openModal('modal-edit-name');
 }
-async function deleteClient(id,name){
-  if(!confirm(`${name} さんのデータを削除しますか？\n予約・チケットも全て削除されます。`))return;
-  const{error}=await sbClient.from('customers').delete().eq('id',id);
-  if(error){showToast('削除に失敗しました');return;}
-  showToast(`${name} さんを削除しました`);await loadCustomers();
+
+async function saveCustomerName() {
+  const customerId = document.getElementById('edit-name-customer-id').value;
+  const newName = document.getElementById('edit-name-value').value.trim();
+  if (!newName) { showToast('名前を入力してください'); return; }
+  const { error } = await sbClient.from('customers').update({ name: newName }).eq('id', customerId);
+  if (error) { showToast('更新に失敗しました'); return; }
+  closeModal('modal-edit-name'); showToast('名前を更新しました'); await loadCustomers();
 }
-function openTicketModal(cid,tid,ticket){
-  document.getElementById('ticket-customer-id').value=cid;
-  document.getElementById('ticket-id').value=tid||'';
-  document.getElementById('ticket-modal-title').textContent=tid?'チケット編集':'チケット追加';
-  if(ticket){document.getElementById('ticket-plan-type').value=ticket.plan_type||'4';document.getElementById('ticket-valid-from').value=ticket.valid_from||'';document.getElementById('ticket-expiry').value=ticket.expires_at||'';}
+
+async function deleteClient(id, name) {
+  if (!confirm(`${name} さんのデータを削除しますか？`)) return;
+  const { error } = await sbClient.from('customers').delete().eq('id', id);
+  if (error) { showToast('削除に失敗しました'); return; }
+  showToast(`${name} さんを削除しました`); await loadCustomers();
+}
+
+function openTicketModal(customerId, ticketId, ticket) {
+  document.getElementById('ticket-customer-id').value = customerId;
+  document.getElementById('ticket-id').value = ticketId || '';
+  document.getElementById('ticket-modal-title').textContent = ticketId ? 'チケット編集' : 'チケット追加';
+  if (ticket) {
+    document.getElementById('ticket-plan-type').value = ticket.plan_type || '4';
+    document.getElementById('ticket-valid-from').value = ticket.valid_from || '';
+    document.getElementById('ticket-expiry').value = ticket.expires_at || '';
+  }
   openModal('modal-ticket');
 }
-async function saveTicket(){
-  const cid=document.getElementById('ticket-customer-id').value,tid=document.getElementById('ticket-id').value;
-  const planType=document.getElementById('ticket-plan-type').value,total=planType==='unlimited'?null:parseInt(planType);
-  const validFrom=document.getElementById('ticket-valid-from').value||null,expiry=document.getElementById('ticket-expiry').value||null;
+
+async function saveTicket() {
+  if (!sbClient) { showToast('Supabaseが未設定です'); return; }
+  const customerId = document.getElementById('ticket-customer-id').value;
+  const ticketId = document.getElementById('ticket-id').value;
+  const planType = document.getElementById('ticket-plan-type').value;
+  const isUnlimited = planType === 'unlimited';
+  const total = isUnlimited ? null : parseInt(planType);
+  const validFrom = document.getElementById('ticket-valid-from').value || null;
+  const expiry = document.getElementById('ticket-expiry').value || null;
   let error;
-  if(tid)({error}=await sbClient.from('tickets').update({plan_type:planType,total_count:total,valid_from:validFrom,expires_at:expiry}).eq('id',tid));
-  else({error}=await sbClient.from('tickets').insert({customer_id:cid,plan_type:planType,total_count:total,remaining_count:total,valid_from:validFrom,expires_at:expiry}));
-  if(error){showToast('保存に失敗しました');return;}
-  closeModal('modal-ticket');showToast('チケットを保存しました');await loadCustomers();
+  if (ticketId) {
+    ({ error } = await sbClient.from('tickets').update({ plan_type: planType, total_count: total, valid_from: validFrom, expires_at: expiry }).eq('id', ticketId));
+  } else {
+    ({ error } = await sbClient.from('tickets').insert({ customer_id: customerId, plan_type: planType, total_count: total, remaining_count: total, valid_from: validFrom, expires_at: expiry }));
+  }
+  if (error) { showToast('保存に失敗しました'); return; }
+  closeModal('modal-ticket'); showToast('チケットを保存しました'); await loadCustomers();
 }
-let currentBookingView='calendar',currentWeekStart=null;
-function setBookingView(view){
-  currentBookingView=view;
-  document.getElementById('booking-calendar-view').style.display=view==='calendar'?'':'none';
-  document.getElementById('booking-list-view').style.display=view==='list'?'':'none';
-  document.getElementById('view-calendar-btn').style.background=view==='calendar'?'#f0fdf4':'';
-  document.getElementById('view-list-btn').style.background=view==='list'?'#f0fdf4':'';
-  if(view==='calendar')renderWeekCalendar();else loadBookingList();
+
+function setBookingView(view) {
+  currentBookingView = view;
+  document.getElementById('booking-calendar-view').style.display = view==='calendar'?'':'none';
+  document.getElementById('booking-list-view').style.display = view==='list'?'':'none';
+  document.getElementById('view-calendar-btn').style.background = view==='calendar'?'#f0fdf4':'';
+  document.getElementById('view-list-btn').style.background = view==='list'?'#f0fdf4':'';
+  if (view==='calendar') renderWeekCalendar(); else loadBookingList();
 }
-function getWeekStart(date){const d=new Date(date);d.setDate(d.getDate()-d.getDay());d.setHours(0,0,0,0);return d;}
-function changeWeek(dir){currentWeekStart.setDate(currentWeekStart.getDate()+dir*7);renderWeekCalendar();}
-async function renderWeekCalendar(){
-  if(!sbClient)return;
-  if(!currentWeekStart)currentWeekStart=getWeekStart(new Date());
-  const weekEnd=new Date(currentWeekStart);weekEnd.setDate(weekEnd.getDate()+6);weekEnd.setHours(23,59,59,999);
+
+function getWeekStart(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate()-d.getDay()); d.setHours(0,0,0,0); return d;
+}
+function changeWeek(dir) { currentWeekStart.setDate(currentWeekStart.getDate()+dir*7); renderWeekCalendar(); }
+
+async function renderWeekCalendar() {
+  if (!sbClient) return;
+  if (!currentWeekStart) currentWeekStart = getWeekStart(new Date());
+  const weekEnd = new Date(currentWeekStart); weekEnd.setDate(weekEnd.getDate()+6); weekEnd.setHours(23,59,59,999);
   const mn=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
   document.getElementById('week-label').textContent=`${currentWeekStart.getFullYear()}年${mn[currentWeekStart.getMonth()]}${currentWeekStart.getDate()}日 〜 ${mn[weekEnd.getMonth()]}${weekEnd.getDate()}日`;
-  const{data:bookings}=await sbClient.from('bookings').select('*, customers(name), menus(name,ticket_cost)').gte('scheduled_at',toLocalDateStr(currentWeekStart)+'T00:00:00').lte('scheduled_at',toLocalDateStr(weekEnd)+'T23:59:59').eq('status','confirmed').order('scheduled_at',{ascending:true});
-  const days=[];for(let i=0;i<7;i++){const d=new Date(currentWeekStart);d.setDate(d.getDate()+i);days.push(d);}
+  const { data: bookings } = await sbClient.from('bookings').select('*, customers(name), menus(name,ticket_cost)').gte('scheduled_at',toLocalDateStr(currentWeekStart)+'T00:00:00').lte('scheduled_at',toLocalDateStr(weekEnd)+'T23:59:59').eq('status','confirmed').order('scheduled_at',{ascending:true});
+  const dn=['日','月','火','水','木','金','土'];
+  const days=[]; for(let i=0;i<7;i++){const d=new Date(currentWeekStart);d.setDate(d.getDate()+i);days.push(d);}
   const today=new Date();today.setHours(0,0,0,0);
   let html='<div style="display:grid;grid-template-columns:56px repeat(7,1fr);border-bottom:2px solid #e8e8e8;"><div></div>';
-  for(const d of days){
-    const isToday=d.getTime()===today.getTime(),isSun=d.getDay()===0,isSat=d.getDay()===6;
-    const col=isSun?'#e06060':isSat?'#6090e0':'#333';
-    html+=`<div style="padding:8px 4px;text-align:center;${isToday?'background:#f0fdf4;':''}"><div style="font-size:11px;color:${col};font-weight:600;">${DAY_NAMES[d.getDay()]}</div><div style="font-size:16px;font-weight:${isToday?'700':'500'};color:${isToday?'#06C755':col};">${d.getDate()}</div></div>`;
-  }
+  for(const d of days){const isToday=d.getTime()===today.getTime();const col=d.getDay()===0?'#e06060':d.getDay()===6?'#6090e0':'#333';html+=`<div style="padding:8px 4px;text-align:center;${isToday?'background:#f0fdf4;':''}"><div style="font-size:11px;color:${col};font-weight:600;">${dn[d.getDay()]}</div><div style="font-size:16px;font-weight:${isToday?'700':'500'};color:${isToday?'#06C755':col};">${d.getDate()}</div></div>`;}
   html+='</div><div style="display:grid;grid-template-columns:56px repeat(7,1fr);">';
-  for(const slot of DEFAULT_SLOTS){
-    const[h]=slot.split(':');
-    html+=`<div style="padding:6px 4px;font-size:11px;color:#aaa;text-align:right;border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;display:flex;align-items:flex-start;justify-content:flex-end;">${slot}</div>`;
-    for(const d of days){
-      const isToday=d.getTime()===today.getTime();
-      const dayB=(bookings||[]).filter(b=>{const bd=new Date(b.scheduled_at);return bd.getFullYear()===d.getFullYear()&&bd.getMonth()===d.getMonth()&&bd.getDate()===d.getDate()&&bd.getHours()===parseInt(h);});
-      let ch='';for(const b of dayB){const tc=b.menus?.ticket_cost;const mk=tc>0?'A':b.menus?.name?.includes('体験')?'B':'C';const mc=MENU_COLORS[mk]||MENU_COLORS.A;ch+=`<div style="background:${mc.bg};border:1px solid ${mc.border};border-radius:6px;padding:2px 6px;font-size:11px;color:${mc.color};margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" onclick="showBookingDetail('${b.id}','${(b.customers?.name||'').replace(/'/g,'`')}','${b.menus?.name||''}','${b.scheduled_at}')"><span style="font-weight:600;">${b.customers?.name?.slice(0,4)||'—'}</span></div>`;}
-      html+=`<div style="border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;padding:2px;${isToday?'background:#fafffe;':''}">${ch}</div>`;
-    }
-  }
-  html+='</div>';document.getElementById('week-grid').innerHTML=html;
+  for(const slot of TIME_SLOTS){const[h]=slot.split(':');html+=`<div style="padding:6px 4px;font-size:11px;color:#aaa;text-align:right;border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;display:flex;align-items:flex-start;justify-content:flex-end;">${slot}</div>`;
+  for(const d of days){const isToday=d.getTime()===today.getTime();const dayB=(bookings||[]).filter(b=>{const bd=new Date(b.scheduled_at);return bd.getFullYear()===d.getFullYear()&&bd.getMonth()===d.getMonth()&&bd.getDate()===d.getDate()&&bd.getHours()===parseInt(h);});let cellHtml='';for(const b of dayB){const tc=b.menus?.ticket_cost;const mk=tc>0?'A':b.menus?.name?.includes('体験')?'B':'C';const mc=MENU_COLORS[mk]||MENU_COLORS['A'];cellHtml+=`<div style="background:${mc.bg};border:1px solid ${mc.border};border-radius:6px;padding:2px 6px;font-size:11px;color:${mc.color};margin-bottom:2px;cursor:pointer;" onclick="showBookingDetail('${b.id}','${(b.customers?.name||'').replace(/'/g,'`')}','${b.menus?.name||''}','${b.scheduled_at}')"><span style="font-weight:600;">${b.customers?.name?.slice(0,4)||'—'}</span></div>`;}
+  html+=`<div style="border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;padding:2px;${isToday?'background:#fafffe;':''}">${cellHtml}</div>`;}}
+  html+='</div>';
+  document.getElementById('week-grid').innerHTML=html;
 }
+
 function showBookingDetail(id,name,menu,scheduledAt){
-  const dt=new Date(scheduledAt);
-  const dtStr=`${dt.getMonth()+1}月${dt.getDate()}日（${DAY_NAMES[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
-  if(confirm(`【${name}】\n${menu}\n${dtStr}\n\nこの予約をキャンセルしますか？`))cancelBooking(id);
+  const dt=new Date(scheduledAt);const dn=['日','月','火','水','木','金','土'];
+  const dtStr=`${dt.getMonth()+1}月${dt.getDate()}日（${dn[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+  if(confirm(`【${name}】\n${menu}\n${dtStr}\n\nこの予約をキャンセルしますか？`)) cancelBooking(id);
 }
-async function loadBookingList(){
-  if(!sbClient)return;
-  const{data}=await sbClient.from('bookings').select('*, customers(name), menus(name)').order('scheduled_at',{ascending:false}).limit(50);
-  if(!data||data.length===0){document.getElementById('booking-list').innerHTML='<div class="loading">予約がありません</div>';return;}
+
+async function loadBookingList() {
+  if (!sbClient) return;
+  const { data, error } = await sbClient.from('bookings').select('*, customers(name), menus(name)').order('scheduled_at',{ascending:false}).limit(50);
+  if (error||!data||!data.length) { document.getElementById('booking-list').innerHTML='<div class="loading">予約がありません</div>'; return; }
   let html='<table><thead><tr><th>日時</th><th>顧客</th><th>メニュー</th><th>状態</th><th>操作</th></tr></thead><tbody>';
-  for(const b of data){
-    const dt=new Date(b.scheduled_at);
-    const dtStr=`${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
-    const sm={confirmed:['確定','badge-green'],cancelled:['キャンセル','badge-red'],completed:['完了','badge-gray']};
-    const[label,cls]=sm[b.status]||['—','badge-gray'];
-    const[bg,fg]=getAvatarColor(b.customers?.name||'');
-    html+=`<tr><td style="font-weight:600;">${dtStr}</td><td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};font-size:10px;">${getInitials(b.customers?.name||'')}</div>${b.customers?.name||'—'}</div></td><td>${b.menus?.name||'—'}</td><td><span class="badge ${cls}">${label}</span></td><td>${b.status==='confirmed'?`<button class="btn btn-sm btn-danger" onclick="cancelBooking('${b.id}')">キャンセル</button>`:'—'}</td></tr>`;
-  }
-  html+='</tbody></table>';document.getElementById('booking-list').innerHTML=html;
+  for(const b of data){const dt=new Date(b.scheduled_at);const dtStr=`${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;const sm={confirmed:['確定','badge-green'],cancelled:['キャンセル','badge-red'],completed:['完了','badge-gray']};const[label,cls]=sm[b.status]||['—','badge-gray'];const[bg,fg]=getAvatarColor(b.customers?.name||'');html+=`<tr><td style="font-weight:600;">${dtStr}</td><td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};font-size:10px;">${getInitials(b.customers?.name||'')}</div>${b.customers?.name||'—'}</div></td><td>${b.menus?.name||'—'}</td><td><span class="badge ${cls}">${label}</span></td><td>${b.status==='confirmed'?`<button class="btn btn-sm btn-danger" onclick="cancelBooking('${b.id}')">キャンセル</button>`:'—'}</td></tr>`;}
+  html+='</tbody></table>';
+  document.getElementById('booking-list').innerHTML=html;
 }
-async function loadBookings(){if(!sbClient)return;currentWeekStart=getWeekStart(new Date());setBookingView('calendar');}
-async function cancelBooking(id){
-  if(!confirm('この予約をキャンセルしますか？'))return;
-  const{error}=await sbClient.from('bookings').update({status:'cancelled'}).eq('id',id);
-  if(error){showToast('キャンセルに失敗しました');return;}
+
+async function loadBookings() { if(!sbClient)return; currentWeekStart=getWeekStart(new Date()); setBookingView('calendar'); }
+
+async function cancelBooking(id) {
+  if (!confirm('この予約をキャンセルしますか？')) return;
+  const { error } = await sbClient.from('bookings').update({status:'cancelled'}).eq('id',id);
+  if (error) { showToast('キャンセルに失敗しました'); return; }
   showToast('予約をキャンセルしました');
-  if(currentBookingView==='calendar')await renderWeekCalendar();else await loadBookingList();
+  if(currentBookingView==='calendar') await renderWeekCalendar(); else await loadBookingList();
 }
-async function openAddBookingModal(){
+
+async function openAddBookingModal() {
   const sel=document.getElementById('booking-customer-id');
   sel.innerHTML='<option value="">選択してください</option>';
-  for(const c of allClients)sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`;
-  const now=new Date();now.setMinutes(0,0,0);
+  for(const c of allClients) sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`;
+  const now=new Date(); now.setMinutes(0,0,0);
   document.getElementById('booking-datetime').value=now.toISOString().slice(0,16);
   openModal('modal-add-booking');
 }
-async function loadCustomerTickets(cid){
-  const sel=document.getElementById('booking-ticket-id');sel.innerHTML='<option value="">チケットなし</option>';
-  if(!cid||!sbClient)return;
-  const{data}=await sbClient.from('tickets').select('*').eq('customer_id',cid);
-  if(data)for(const t of data)sel.innerHTML+=`<option value="${t.id}">${PLAN_NAMES[t.plan_type]||t.plan_type}${t.plan_type!=='unlimited'?` (残${t.remaining_count}回)`:''}</option>`;
+
+async function loadCustomerTickets(customerId) {
+  const sel=document.getElementById('booking-ticket-id');
+  sel.innerHTML='<option value="">チケットなし</option>';
+  if(!customerId||!sbClient)return;
+  const{data}=await sbClient.from('tickets').select('*').eq('customer_id',customerId);
+  if(data)for(const t of data){const label=PLAN_NAMES[t.plan_type]||t.plan_type;const rem=t.plan_type!=='unlimited'?` (残${t.remaining_count}回)`:'';sel.innerHTML+=`<option value="${t.id}">${label}${rem}</option>`;}
 }
-async function addBooking(){
+
+async function addBooking() {
   if(!sbClient){showToast('Supabaseが未設定です');return;}
-  const cid=document.getElementById('booking-customer-id').value,tid=document.getElementById('booking-ticket-id').value,dt=document.getElementById('booking-datetime').value,dur=parseInt(document.getElementById('booking-duration').value);
-  if(!cid||!dt){showToast('顧客と日時を選択してください');return;}
-  const{error}=await sbClient.from('bookings').insert({customer_id:cid,ticket_id:tid||null,scheduled_at:new Date(dt).toISOString(),duration_minutes:dur,status:'confirmed'});
+  const customerId=document.getElementById('booking-customer-id').value;
+  const ticketId=document.getElementById('booking-ticket-id').value;
+  const dt=document.getElementById('booking-datetime').value;
+  const duration=parseInt(document.getElementById('booking-duration').value);
+  if(!customerId||!dt){showToast('顧客と日時を選択してください');return;}
+  const{error}=await sbClient.from('bookings').insert({customer_id:customerId,ticket_id:ticketId||null,scheduled_at:new Date(dt).toISOString(),duration_minutes:duration,status:'confirmed'});
   if(error){showToast('予約の追加に失敗しました');return;}
-  if(tid){const ticket=allClients.flatMap(c=>c.tickets||[]).find(t=>t.id===tid);if(ticket&&ticket.plan_type!=='unlimited'&&ticket.remaining_count>0)await sbClient.from('tickets').update({remaining_count:ticket.remaining_count-1}).eq('id',tid);}
+  if(ticketId){const ticket=allClients.flatMap(c=>c.tickets||[]).find(t=>t.id===ticketId);if(ticket&&ticket.plan_type!=='unlimited'&&ticket.remaining_count>0)await sbClient.from('tickets').update({remaining_count:ticket.remaining_count-1}).eq('id',ticketId);}
   closeModal('modal-add-booking');showToast('予約を追加しました');await loadAll();
 }
-async function toggleTicketPanel(cid,tr){
-  const pr=document.getElementById('ticket-panel-'+cid),pi=document.getElementById('ticket-panel-inner-'+cid);
-  if(pr.style.display!=='none'){pr.style.display='none';return;}
-  pr.style.display='';
-  const{data:tickets}=await sbClient.from('tickets').select('*').eq('customer_id',cid).order('valid_from',{ascending:true});
-  if(!tickets||tickets.length===0){pi.innerHTML='<div style="font-size:13px;color:#aaa;text-align:center;padding:8px;">チケットがありません</div>';return;}
+
+async function toggleTicketPanel(customerId, tr) {
+  const panelRow=document.getElementById('ticket-panel-'+customerId);
+  const panelInner=document.getElementById('ticket-panel-inner-'+customerId);
+  if(panelRow.style.display!=='none'){panelRow.style.display='none';return;}
+  panelRow.style.display='';
+  const{data:tickets}=await sbClient.from('tickets').select('*').eq('customer_id',customerId).order('valid_from',{ascending:true});
+  if(!tickets||!tickets.length){panelInner.innerHTML='<div style="font-size:13px;color:#aaa;text-align:center;padding:8px;">チケットがありません</div>';return;}
   const todayStr=new Date().toISOString().slice(0,10);
   let html='<div class="ticket-panel-title">🎫 チケット一覧</div>';
   for(const t of tickets){
     const isActive=(!t.valid_from||t.valid_from<=todayStr)&&(!t.expires_at||t.expires_at>=todayStr);
     const isFuture=t.valid_from&&t.valid_from>todayStr;
-    const sl=isActive?'<span class="ticket-item-status status-active">有効</span>':isFuture?'<span class="ticket-item-status status-future">予定</span>':'<span class="ticket-item-status status-expired">期限切れ</span>';
-    const bc=t.plan_type==='unlimited'?'badge-green':t.plan_type==='8'?'badge-blue':'badge-amber';
-    const cnt=t.plan_type==='unlimited'?'∞':`${t.remaining_count} / ${t.total_count}回`;
-    const dec=t.plan_type!=='unlimited'&&t.remaining_count>0?`<button class="btn btn-sm" style="margin-left:8px;" onclick="decrementTicket('${t.id}','${cid}',${t.remaining_count})">−1</button>`:'';
-    html+=`<div class="ticket-item"><span class="badge ${bc} ticket-item-badge">${PLAN_NAMES[t.plan_type]||t.plan_type}</span><span class="ticket-item-period">${t.valid_from||'—'} 〜 ${t.expires_at||'—'}</span><span class="ticket-item-count">${cnt}</span>${sl}${dec}<button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="deleteTicket('${t.id}','${cid}')">削除</button></div>`;
+    const isExpired=t.expires_at&&t.expires_at<todayStr;
+    const statusLabel=isActive?'<span class="ticket-item-status status-active">有効</span>':isFuture?'<span class="ticket-item-status status-future">予定</span>':'<span class="ticket-item-status status-expired">期限切れ</span>';
+    const planBadgeClass=t.plan_type==='unlimited'?'badge-green':t.plan_type==='8'?'badge-blue':'badge-amber';
+    const countStr=t.plan_type==='unlimited'?'∞':`${t.remaining_count} / ${t.total_count}回`;
+    const periodStr=(t.valid_from||'—')+' 〜 '+(t.expires_at||'—');
+    const canDecrement=t.plan_type!=='unlimited'&&t.remaining_count>0;
+    const decrementBtn=canDecrement?`<button class="btn btn-sm" style="margin-left:8px;font-weight:600;" onclick="decrementTicket('${t.id}','${customerId}',${t.remaining_count})">−1</button>`:'';
+    const incrementBtn=t.plan_type!=='unlimited'?`<button class="btn btn-sm btn-primary" style="margin-left:4px;font-weight:600;" onclick="incrementTicket('${t.id}','${customerId}',${t.remaining_count})">+1</button>`:'';
+    html+=`<div class="ticket-item"><span class="badge ${planBadgeClass} ticket-item-badge">${PLAN_NAMES[t.plan_type]||t.plan_type}</span><span class="ticket-item-period">${periodStr}</span><span class="ticket-item-count">${countStr}</span>${statusLabel}${decrementBtn}${incrementBtn}<button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="deleteTicket('${t.id}','${customerId}')">削除</button></div>`;
   }
-  pi.innerHTML=html;
+  panelInner.innerHTML=html;
 }
-function openBulkTicketModal(){
-  const pn=PLAN_NAMES[currentClientTab]||currentClientTab;
-  document.getElementById('bulk-modal-title').textContent=`一括チケット付与（${pn}）`;
-  document.getElementById('bulk-target-info').textContent=`プラン: ${pn} ／ 付与したい会員にチェックを入れてください`;
+
+function openBulkTicketModal() {
+  const planName=PLAN_NAMES[currentClientTab]||currentClientTab;
+  document.getElementById('bulk-modal-title').textContent=`一括チケット付与（${planName}）`;
+  document.getElementById('bulk-target-info').textContent=`プラン: ${planName} ／ 付与したい会員にチェックを入れてください`;
   const targets=allClients.filter(c=>c.tickets?.some(t=>t.plan_type===currentClientTab));
   let html='';
-  if(targets.length===0){html='<div style="font-size:13px;color:#aaa;text-align:center;padding:8px;">対象顧客がいません</div>';}
-  else{html=`<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#888;padding:4px 4px 8px;border-bottom:1px solid #f0f0f0;margin-bottom:4px;cursor:pointer;"><input type="checkbox" id="bulk-check-all" onchange="toggleAllBulk(this.checked)"> 全員選択</label>`;for(const c of targets)html+=`<label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 4px;cursor:pointer;"><input type="checkbox" class="bulk-check" value="${c.id}"> ${c.name}</label>`;}
+  if(!targets.length){html='<div style="font-size:13px;color:#aaa;text-align:center;padding:8px;">対象顧客がいません</div>';}
+  else{html+=`<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#888;padding:4px 4px 8px;border-bottom:1px solid #f0f0f0;margin-bottom:4px;cursor:pointer;"><input type="checkbox" id="bulk-check-all" onchange="toggleAllBulk(this.checked)"> 全員選択</label>`;for(const c of targets)html+=`<label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 4px;cursor:pointer;"><input type="checkbox" class="bulk-check" value="${c.id}"> ${c.name}</label>`;}
   document.getElementById('bulk-checkbox-list').innerHTML=html;
-  const now=new Date(),nm=new Date(now.getFullYear(),now.getMonth()+1,1),nme=new Date(now.getFullYear(),now.getMonth()+2,0);
-  document.getElementById('bulk-valid-from').value=nm.toISOString().slice(0,10);
-  document.getElementById('bulk-expiry').value=nme.toISOString().slice(0,10);
+  const now=new Date();const nextMonth=new Date(now.getFullYear(),now.getMonth()+1,1);const nextMonthEnd=new Date(now.getFullYear(),now.getMonth()+2,0);
+  document.getElementById('bulk-valid-from').value=nextMonth.toISOString().slice(0,10);
+  document.getElementById('bulk-expiry').value=nextMonthEnd.toISOString().slice(0,10);
   openModal('modal-bulk-ticket');
 }
-function toggleAllBulk(c){document.querySelectorAll('.bulk-check').forEach(cb=>cb.checked=c);}
-async function executeBulkTicket(){
-  const vf=document.getElementById('bulk-valid-from').value,ex=document.getElementById('bulk-expiry').value;
-  if(!vf||!ex){showToast('開始日と終了日を入力してください');return;}
-  const sel=[...document.querySelectorAll('.bulk-check:checked')].map(cb=>cb.value);
-  if(sel.length===0){showToast('付与する会員を選択してください');return;}
-  if(!confirm(`${sel.length}名にチケットを付与します。よろしいですか？`))return;
-  const pt=currentClientTab,total=pt==='unlimited'?null:parseInt(pt);
-  let ok=0;
-  for(const cid of sel){const{error}=await sbClient.from('tickets').insert({customer_id:cid,plan_type:pt,total_count:total,remaining_count:total,valid_from:vf,expires_at:ex});if(!error)ok++;}
-  closeModal('modal-bulk-ticket');showToast(`${ok}名にチケットを付与しました`);await loadCustomers();
+
+function toggleAllBulk(checked){document.querySelectorAll('.bulk-check').forEach(cb=>cb.checked=checked);}
+
+async function executeBulkTicket() {
+  const validFrom=document.getElementById('bulk-valid-from').value;const expiry=document.getElementById('bulk-expiry').value;
+  if(!validFrom||!expiry){showToast('開始日と終了日を入力してください');return;}
+  const selected=[...document.querySelectorAll('.bulk-check:checked')].map(cb=>cb.value);
+  if(!selected.length){showToast('付与する会員を選択してください');return;}
+  if(!confirm(`${selected.length}名にチケットを付与します。よろしいですか？`))return;
+  const planType=currentClientTab;const isUnlimited=planType==='unlimited';const total=isUnlimited?null:parseInt(planType);
+  let successCount=0;
+  for(const customerId of selected){const{error}=await sbClient.from('tickets').insert({customer_id:customerId,plan_type:planType,total_count:total,remaining_count:total,valid_from:validFrom,expires_at:expiry});if(!error)successCount++;}
+  closeModal('modal-bulk-ticket');showToast(`${successCount}名にチケットを付与しました`);await loadCustomers();
 }
-async function decrementTicket(tid,cid,cur){
-  if(!confirm(`残回数を ${cur} → ${cur-1} に変更しますか？`))return;
-  const{error}=await sbClient.from('tickets').update({remaining_count:cur-1}).eq('id',tid);
+
+async function decrementTicket(ticketId,customerId,currentRemaining) {
+  if(!confirm(`残回数を ${currentRemaining} → ${currentRemaining-1} に変更しますか？`))return;
+  const{error}=await sbClient.from('tickets').update({remaining_count:currentRemaining-1}).eq('id',ticketId);
   if(error){showToast('更新に失敗しました');return;}
   showToast('残回数を1減らしました');await loadCustomers();
-  const pr=document.getElementById('ticket-panel-'+cid);if(pr)pr.style.display='none';
+  const pr=document.getElementById('ticket-panel-'+customerId);if(pr)pr.style.display='none';
 }
-async function deleteTicket(tid,cid){
+
+async function incrementTicket(ticketId,customerId,currentRemaining) {
+  if(!confirm(`残回数を ${currentRemaining} → ${currentRemaining+1} に変更しますか？`))return;
+  const{error}=await sbClient.from('tickets').update({remaining_count:currentRemaining+1}).eq('id',ticketId);
+  if(error){showToast('更新に失敗しました');return;}
+  showToast('残回数を1増やしました');await loadCustomers();
+  const pr=document.getElementById('ticket-panel-'+customerId);if(pr)pr.style.display='none';
+}
+
+async function deleteTicket(ticketId,customerId) {
   if(!confirm('このチケットを削除しますか？'))return;
-  const{error}=await sbClient.from('tickets').delete().eq('id',tid);
+  const{error}=await sbClient.from('tickets').delete().eq('id',ticketId);
   if(error){showToast('削除に失敗しました');return;}
   showToast('チケットを削除しました');await loadCustomers();
-  const pr=document.getElementById('ticket-panel-'+cid);if(pr)pr.style.display='none';
+  const pr=document.getElementById('ticket-panel-'+customerId);if(pr)pr.style.display='none';
 }
-async function loadDashboard(){
+
+async function loadDashboard() {
   if(!sbClient)return;
   document.getElementById('m-customers').textContent=allClients.length;
-  const at=allClients.flatMap(c=>c.tickets||[]);
-  document.getElementById('m-tickets').textContent=at.length;
-  document.getElementById('m-low').textContent=at.filter(t=>t.plan_type!=='unlimited'&&t.remaining_count<=5).length;
-  const sm=new Date();sm.setDate(1);sm.setHours(0,0,0,0);
-  const{count}=await sbClient.from('bookings').select('*',{count:'exact',head:true}).gte('scheduled_at',sm.toISOString()).eq('status','confirmed');
+  const allTickets=allClients.flatMap(c=>c.tickets||[]);
+  document.getElementById('m-tickets').textContent=allTickets.length;
+  document.getElementById('m-low').textContent=allTickets.filter(t=>t.plan_type!=='unlimited'&&t.remaining_count<=5).length;
+  const startOfMonth=new Date();startOfMonth.setDate(1);startOfMonth.setHours(0,0,0,0);
+  const{count}=await sbClient.from('bookings').select('*',{count:'exact',head:true}).gte('scheduled_at',startOfMonth.toISOString()).eq('status','confirmed');
   document.getElementById('m-bookings').textContent=count||0;
-  const lc=allClients.filter(c=>c.tickets?.some(t=>t.plan_type!=='unlimited'&&t.remaining_count<=5));
-  if(lc.length===0){document.getElementById('low-ticket-list').innerHTML='<div class="loading">残数が少ない顧客はいません</div>';}
-  else{
-    let html='<table><thead><tr><th>顧客名</th><th>プラン</th><th>残回数</th><th>期限</th><th>操作</th></tr></thead><tbody>';
-    for(const c of lc){const tk=c.tickets.find(t=>t.remaining_count<=5);const[bg,fg]=getAvatarColor(c.name);const pct=tk.total_count?Math.round((tk.remaining_count/tk.total_count)*100):0;html+=`<tr><td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};">${getInitials(c.name)}</div>${c.name}</div></td><td><span class="badge ${tk.plan_type==='unlimited'?'badge-green':tk.plan_type==='8'?'badge-blue':'badge-amber'}">${PLAN_NAMES[tk.plan_type]||tk.plan_type}</span></td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${pct<=20?'bar-red':'bar-amber'}" style="width:${pct}%"></div></div><div class="bar-text">${tk.remaining_count} / ${tk.total_count}</div></div></td><td style="font-size:12px;color:#888;">${tk.valid_from||''}〜${tk.expires_at||'—'}</td><td><button class="btn btn-sm" onclick="openTicketModal('${c.id}','',null)">＋チケット追加</button></td></tr>`;}
-    html+='</tbody></table>';document.getElementById('low-ticket-list').innerHTML=html;
-  }
-  const{data:rb}=await sbClient.from('bookings').select('*, customers(name)').order('scheduled_at',{ascending:false}).limit(5);
-  if(!rb||rb.length===0){document.getElementById('recent-bookings').innerHTML='<div class="loading">予約がありません</div>';}
-  else{
-    let html='<table><thead><tr><th>日時</th><th>顧客</th><th>状態</th></tr></thead><tbody>';
-    for(const b of rb){const dt=new Date(b.scheduled_at);const dtStr=`${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;const sm={confirmed:['確定','badge-green'],cancelled:['キャンセル','badge-red'],completed:['完了','badge-gray']};const[lbl,cls]=sm[b.status]||['—','badge-gray'];const[bg,fg]=getAvatarColor(b.customers?.name||'');html+=`<tr><td style="font-weight:600;">${dtStr}</td><td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};font-size:10px;">${getInitials(b.customers?.name||'')}</div>${b.customers?.name||'—'}</div></td><td><span class="badge ${cls}">${lbl}</span></td></tr>`;}
-    html+='</tbody></table>';document.getElementById('recent-bookings').innerHTML=html;
-  }
+  const lowClients=allClients.filter(c=>c.tickets?.some(t=>t.plan_type!=='unlimited'&&t.remaining_count<=5));
+  if(!lowClients.length){document.getElementById('low-ticket-list').innerHTML='<div class="loading">残数が少ない顧客はいません</div>';}
+  else{let html='<table><thead><tr><th>顧客名</th><th>プラン</th><th>残回数</th><th>期限</th><th>操作</th></tr></thead><tbody>';for(const c of lowClients){const ticket=c.tickets.find(t=>t.remaining_count<=5);const[bg,fg]=getAvatarColor(c.name);const pct=ticket.total_count?Math.round((ticket.remaining_count/ticket.total_count)*100):0;html+=`<tr><td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};">${getInitials(c.name)}</div>${c.name}</div></td><td><span class="badge ${ticket.plan_type==='unlimited'?'badge-green':ticket.plan_type==='8'?'badge-blue':'badge-amber'}">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}</span></td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${pct<=20?'bar-red':'bar-amber'}" style="width:${pct}%"></div></div><div class="bar-text">${ticket.remaining_count} / ${ticket.total_count}</div></div></td><td style="font-size:12px;color:#888;">${ticket.valid_from||''}〜${ticket.expires_at||'—'}</td><td><button class="btn btn-sm" onclick="openTicketModal('${c.id}','',null)">＋チケット追加</button></td></tr>`;}html+='</tbody></table>';document.getElementById('low-ticket-list').innerHTML=html;}
+  const{data:recentB}=await sbClient.from('bookings').select('*, customers(name)').order('scheduled_at',{ascending:false}).limit(5);
+  if(!recentB||!recentB.length){document.getElementById('recent-bookings').innerHTML='<div class="loading">予約がありません</div>';}
+  else{let html='<table><thead><tr><th>日時</th><th>顧客</th><th>状態</th></tr></thead><tbody>';for(const b of recentB){const dt=new Date(b.scheduled_at);const dtStr=`${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;const sm={confirmed:['確定','badge-green'],cancelled:['キャンセル','badge-red'],completed:['完了','badge-gray']};const[label,cls]=sm[b.status]||['—','badge-gray'];const[bg,fg]=getAvatarColor(b.customers?.name||'');html+=`<tr><td style="font-weight:600;">${dtStr}</td><td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};font-size:10px;">${getInitials(b.customers?.name||'')}</div>${b.customers?.name||'—'}</div></td><td><span class="badge ${cls}">${label}</span></td></tr>`;}html+='</tbody></table>';document.getElementById('recent-bookings').innerHTML=html;}
 }
-function toLocalDateStr(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;}
 
-// ========== 予約枠週間カレンダー ==========
-let slotWeekStart=null;
-function openSlotEditModal(){const p=document.getElementById('slot-edit-panel');p.style.display=p.style.display==='none'?'':'none';if(p.style.display!=='none'){loadSlotList();loadWeeklySlotList();}}
+function toLocalDateStr(date){const y=date.getFullYear();const m=String(date.getMonth()+1).padStart(2,'0');const d=String(date.getDate()).padStart(2,'0');return`${y}-${m}-${d}`;}
+
+function openSlotEditModal(){const panel=document.getElementById('slot-edit-panel');panel.style.display=panel.style.display==='none'?'':'none';if(panel.style.display!=='none'){loadSlotList();loadWeeklySlotList();}}
 function changeSlotWeek(dir){slotWeekStart.setDate(slotWeekStart.getDate()+dir*7);renderSlotWeekCalendar();}
 async function initSlotWeek(){if(!slotWeekStart)slotWeekStart=getWeekStart(new Date());await renderSlotWeekCalendar();}
-async function renderSlotWeekCalendar(){
+
+async function renderSlotWeekCalendar() {
   if(!sbClient)return;
   const weekEnd=new Date(slotWeekStart);weekEnd.setDate(weekEnd.getDate()+6);weekEnd.setHours(23,59,59,999);
   const mn=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
@@ -671,217 +759,188 @@ async function renderSlotWeekCalendar(){
   const{data:bookings}=await sbClient.from('bookings').select('*, menus(ticket_cost,max_per_slot)').gte('scheduled_at',slotWeekStart.toISOString()).lte('scheduled_at',weekEnd.toISOString()).eq('status','confirmed');
   const{data:slotSettings}=await sbClient.from('slot_settings').select('*').gte('date',toLocalDateStr(slotWeekStart)).lte('date',toLocalDateStr(weekEnd));
   const{data:weeklySettings}=await sbClient.from('weekly_slot_settings').select('*');
+  const dn=['日','月','火','水','木','金','土'];
   const days=[];for(let i=0;i<7;i++){const d=new Date(slotWeekStart);d.setDate(d.getDate()+i);days.push(d);}
   const today=new Date();today.setHours(0,0,0,0);
+
   let html='<div style="display:grid;grid-template-columns:56px repeat(7,1fr);border-bottom:2px solid #e8e8e8;"><div></div>';
   for(const d of days){
-    const isToday=d.getTime()===today.getTime(),ds=toLocalDateStr(d);
-    const ss=slotSettings?.find(s=>s.date===ds),ws=weeklySettings?.find(w=>w.day_of_week===d.getDay());
+    const isToday=d.getTime()===today.getTime();const col=d.getDay()===0?'#e06060':d.getDay()===6?'#6090e0':'#333';
+    const ds=toLocalDateStr(d);const ss=slotSettings?.find(s=>s.date===ds);const ws=weeklySettings?.find(w=>w.day_of_week===d.getDay());
     const isClosed=ss?ss.is_closed:(ws?ws.is_closed:false);
-    const isSun=d.getDay()===0,isSat=d.getDay()===6,col=isSun?'#e06060':isSat?'#6090e0':'#333';
-    html+=`<div style="padding:8px 4px;text-align:center;${isToday?'background:#f0fdf4;':''}"><div style="font-size:11px;color:${col};font-weight:600;">${DAY_NAMES[d.getDay()]}</div><div style="font-size:16px;font-weight:${isToday?'700':'500'};color:${isToday?'#06C755':col};">${d.getDate()}</div>${isClosed?'<div style="font-size:10px;color:#e74c3c;font-weight:600;">休業</div>':''}</div>`;
+    html+=`<div style="padding:8px 4px;text-align:center;${isToday?'background:#f0fdf4;':''}${isClosed?'background:#fafafa;':''}"><div style="font-size:11px;color:${col};font-weight:600;">${dn[d.getDay()]}</div><div style="font-size:16px;font-weight:${isToday?'700':'500'};color:${isToday?'#06C755':col};">${d.getDate()}</div>${isClosed?'<div style="font-size:10px;color:#e74c3c;font-weight:600;">休業</div>':''}</div>`;
   }
   html+='</div><div style="display:grid;grid-template-columns:56px repeat(7,1fr);">';
+
   for(const slot of DEFAULT_SLOTS){
     const[h]=slot.split(':');
     html+=`<div style="padding:4px;font-size:11px;color:#aaa;text-align:right;border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:52px;display:flex;align-items:center;justify-content:flex-end;">${slot}</div>`;
     for(const d of days){
-      const isToday=d.getTime()===today.getTime(),ds=toLocalDateStr(d);
-      const ss=slotSettings?.find(s=>s.date===ds),ws=weeklySettings?.find(w=>w.day_of_week===d.getDay());
-      const isClosed=ss?ss.is_closed:(ws?ws.is_closed:false);
+      const isToday=d.getTime()===today.getTime();
+      const ds=toLocalDateStr(d);
+      const ss=slotSettings?.find(s=>s.date===ds);
+      const ws=weeklySettings?.find(w=>w.day_of_week===d.getDay());
       const hasSetting=ss||ws;
-      const weeklyAvail=ws?.available_slots||DEFAULT_SLOTS;
-      const availSlots=ss?ss.available_slots:weeklyAvail;
+      const isClosed=ss?ss.is_closed:(ws?ws.is_closed:false);
+      const availSlots=ss?ss.available_slots:(ws?ws.available_slots:DEFAULT_SLOTS);
       const semiMax=ss?(ss.semi_max_per_slot?.[slot]||2):(ws?(ws.semi_max_per_slot?.[slot]||2):2);
       const isAvailable=hasSetting&&!isClosed&&availSlots?.includes(slot);
-      // ★★★ 手動ブロック判定: 週間テンプレートにはあるが日付指定で除外されている ★★★
-      const isManuallyBlocked=ss&&weeklyAvail?.includes(slot)&&!availSlots?.includes(slot);
-      const sb=(bookings||[]).filter(b=>{const bd=new Date(b.scheduled_at);return bd.getFullYear()===d.getFullYear()&&bd.getMonth()===d.getMonth()&&bd.getDate()===d.getDate()&&bd.getHours()===parseInt(h);});
-      const bc=sb.length,tc=semiMax+2,rem=tc-bc;
-      let cellBg,cellBorder,cellText;
-      if(isManuallyBlocked){cellBg='#f0e8ff';cellBorder='#d4b8f0';cellText='<div style="font-size:13px;color:#7b4fa0;">🚫</div>';}
-      else if(!hasSetting){cellBg='transparent';cellBorder='transparent';cellText='';}
-      else if(!isAvailable){cellBg='#f5f5f5';cellBorder='#e8e8e8';cellText='';}
-      else if(bc===0){cellBg='#e6f7ee';cellBorder='#b7e5cc';cellText=`<div style="font-size:11px;color:#0a7a4a;font-weight:600;">空き${tc}</div>`;}
-      else if(rem<=1){cellBg='#ffeaea';cellBorder='#f5c6c6';cellText=`<div style="font-size:11px;color:#c0392b;font-weight:600;">${bc}/${tc}</div><div style="font-size:10px;color:#e74c3c;">残${rem}</div>`;}
-      else{cellBg='#fff8e1';cellBorder='#f5dda0';cellText=`<div style="font-size:11px;color:#9a6800;font-weight:600;">${bc}/${tc}</div><div style="font-size:10px;color:#b8860b;">残${rem}</div>`;}
-      const clickable=isAvailable||isManuallyBlocked;
-      html+=`<div style="border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:52px;padding:4px;"><div style="height:100%;background:${cellBg};border:1px solid ${cellBorder};border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${clickable?'pointer':'default'};" onclick="${clickable?`openSlotQuickEdit('${ds}','${slot}')`:''}">${cellText}</div></div>`;
+
+      // ★ 週間テンプレートにはあるが日付指定でブロックされているか検知
+      const weeklyAvailSlots=ws?(ws.available_slots||DEFAULT_SLOTS):[];
+      const isDateBlocked=!isAvailable&&!isClosed&&ss&&!(ss.available_slots||[]).includes(slot)&&weeklyAvailSlots.includes(slot);
+
+      const slotBookings=(bookings||[]).filter(b=>{const bd=new Date(b.scheduled_at);return bd.getFullYear()===d.getFullYear()&&bd.getMonth()===d.getMonth()&&bd.getDate()===d.getDate()&&bd.getHours()===parseInt(h);});
+      const bookedCount=slotBookings.length;
+      const totalCapacity=semiMax+2;
+      const remaining=totalCapacity-bookedCount;
+
+      let cellBg,cellBorder,cellText,cellOnClick='',cellCursor='default';
+
+      if(!hasSetting){
+        cellBg='transparent';cellBorder='transparent';cellText='';
+      } else if(isClosed){
+        cellBg='#f5f5f5';cellBorder='#e8e8e8';cellText='';
+      } else if(isDateBlocked){
+        // ★ 予約不可（紫系）
+        cellBg='#f0e6ff';cellBorder='#d4b0f0';
+        cellText='<div style="font-size:11px;color:#7c3aed;font-weight:600;">🚫 予約不可</div><div style="font-size:10px;color:#9d5cf5;">タップで解除</div>';
+        cellOnClick=`unblockSlot('${ds}','${slot}')`;cellCursor='pointer';
+      } else if(!isAvailable){
+        cellBg='#f5f5f5';cellBorder='#e8e8e8';cellText='';
+      } else if(bookedCount===0){
+        cellBg='#e6f7ee';cellBorder='#b7e5cc';
+        cellText=`<div style="font-size:11px;color:#0a7a4a;font-weight:600;">空き${totalCapacity}</div>`;
+        cellOnClick=`blockSlot('${ds}','${slot}')`;cellCursor='pointer';
+      } else if(remaining<=1){
+        cellBg='#ffeaea';cellBorder='#f5c6c6';
+        cellText=`<div style="font-size:11px;color:#c0392b;font-weight:600;">${bookedCount}/${totalCapacity}</div><div style="font-size:10px;color:#e74c3c;">残${remaining}</div>`;
+        cellOnClick=`blockSlot('${ds}','${slot}')`;cellCursor='pointer';
+      } else {
+        cellBg='#fff8e1';cellBorder='#f5dda0';
+        cellText=`<div style="font-size:11px;color:#9a6800;font-weight:600;">${bookedCount}/${totalCapacity}</div><div style="font-size:10px;color:#b8860b;">残${remaining}</div>`;
+        cellOnClick=`blockSlot('${ds}','${slot}')`;cellCursor='pointer';
+      }
+
+      html+=`<div style="border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:52px;padding:4px;"><div style="height:100%;background:${cellBg};border:1px solid ${cellBorder};border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${cellCursor};" ${cellOnClick?`onclick="${cellOnClick}"`:''}>${cellText}</div></div>`;
     }
   }
-  html+='</div>';document.getElementById('slot-week-grid').innerHTML=html;
-}
-function openSlotQuickEdit(date,slot){
-  document.getElementById('slot-date').value=date;
-  document.getElementById('slot-edit-panel').style.display='';
-  loadSlotSetting();
-  document.getElementById('slot-edit-panel').scrollIntoView({behavior:'smooth'});
+  html+='</div>';
+  document.getElementById('slot-week-grid').innerHTML=html;
 }
 
-// ========== 週間テンプレート ==========
+// ★★★ 指定した時間帯を予約不可にする ★★★
+async function blockSlot(date, slot) {
+  if(!confirm(`${date} の ${slot} を予約不可にしますか？\n（既存の予約はキャンセルされません）`))return;
+  const{data:existing}=await sbClient.from('slot_settings').select('*').eq('date',date).single();
+  if(existing){
+    // 既存の日付設定からこの時間帯を除く
+    const newSlots=(existing.available_slots||[]).filter(s=>s!==slot);
+    await sbClient.from('slot_settings').update({available_slots:newSlots}).eq('date',date);
+  } else {
+    // 週間テンプレートをベースにこの時間帯だけ除いた設定を新規作成
+    const dow=new Date(date+'T00:00:00').getDay();
+    const{data:ws}=await sbClient.from('weekly_slot_settings').select('*').eq('day_of_week',dow).single();
+    const baseSlots=ws?.available_slots||DEFAULT_SLOTS;
+    const newSlots=baseSlots.filter(s=>s!==slot);
+    const semiMaxPerSlot=ws?.semi_max_per_slot||{};
+    await sbClient.from('slot_settings').insert({date,available_slots:newSlots,is_closed:false,semi_max_per_slot:semiMaxPerSlot});
+  }
+  showToast(`${slot} を予約不可にしました`);
+  await renderSlotWeekCalendar();
+}
+
+// ★★★ 予約不可を解除して予約可能に戻す ★★★
+async function unblockSlot(date, slot) {
+  if(!confirm(`${date} の ${slot} を予約可能に戻しますか？`))return;
+  const{data:existing}=await sbClient.from('slot_settings').select('*').eq('date',date).single();
+  if(!existing)return;
+  const current=existing.available_slots||[];
+  if(!current.includes(slot)){
+    const newSlots=[...current,slot].sort();
+    await sbClient.from('slot_settings').update({available_slots:newSlots}).eq('date',date);
+  }
+  showToast(`${slot} を予約可能に戻しました`);
+  await renderSlotWeekCalendar();
+}
+
+function openSlotQuickEdit(date,slot){document.getElementById('slot-date').value=date;document.getElementById('slot-edit-panel').style.display='';loadSlotSetting();document.getElementById('slot-edit-panel').scrollIntoView({behavior:'smooth'});}
+
 async function loadWeeklyDay(day,el){
-  if(!sbClient)initSupabase();
+  if(!sbClient)initSupabase();if(!sbClient){showToast('Supabase未接続');return;}
   document.querySelectorAll('#weekly-day-tabs .btn').forEach(b=>b.classList.remove('btn-primary'));
   el.classList.add('btn-primary');
   document.getElementById('weekly-day-index').value=day;
   const{data}=await sbClient.from('weekly_slot_settings').select('*').eq('day_of_week',day).single();
-  const activeSlots=data?.available_slots||DEFAULT_SLOTS,isClosed=data?.is_closed||false,smp=data?.semi_max_per_slot||{};
+  const activeSlots=data?.available_slots||DEFAULT_SLOTS;const isClosed=data?.is_closed||false;const semiMaxPerSlot=data?.semi_max_per_slot||{};
   document.getElementById('weekly-is-closed').checked=isClosed;
-  let html='';for(const s of DEFAULT_SLOTS){const c=activeSlots.includes(s)?'checked':'';html+=`<label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;"><input type="checkbox" value="${s}" ${c} class="weekly-slot-checkbox"> ${s}</label>`;}
+  let html='';for(const slot of DEFAULT_SLOTS){const checked=activeSlots.includes(slot)?'checked':'';html+=`<label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;"><input type="checkbox" value="${slot}" ${checked} class="weekly-slot-checkbox"> ${slot}</label>`;}
   document.getElementById('weekly-checkboxes').innerHTML=html;
-  let sh='';for(const s of DEFAULT_SLOTS){const c=smp[s]||2;sh+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${s}</span><select class="form-input weekly-semi-max-select" data-slot="${s}" style="width:120px;"><option value="1" ${c==1?'selected':''}>1名</option><option value="2" ${c==2?'selected':''}>2名（通常）</option><option value="3" ${c==3?'selected':''}>3名</option><option value="4" ${c==4?'selected':''}>4名</option><option value="6" ${c==6?'selected':''}>6名</option></select></div>`;}
-  document.getElementById('weekly-semi-max-per-slot').innerHTML=sh;
+  let shtml='';for(const slot of DEFAULT_SLOTS){const cur=semiMaxPerSlot[slot]||2;shtml+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${slot}</span><select class="form-input weekly-semi-max-select" data-slot="${slot}" style="width:120px;"><option value="1" ${cur==1?'selected':''}>1名</option><option value="2" ${cur==2?'selected':''}>2名（通常）</option><option value="3" ${cur==3?'selected':''}>3名</option><option value="4" ${cur==4?'selected':''}>4名</option><option value="6" ${cur==6?'selected':''}>6名</option></select></div>`;}
+  document.getElementById('weekly-semi-max-per-slot').innerHTML=shtml;
   document.getElementById('weekly-editor').style.display='block';
 }
+
 async function saveWeeklySlot(){
-  const day=parseInt(document.getElementById('weekly-day-index').value),isClosed=document.getElementById('weekly-is-closed').checked;
-  const available_slots=isClosed?[]:[...document.querySelectorAll('.weekly-slot-checkbox:checked')].map(c=>c.value);
+  const day=parseInt(document.getElementById('weekly-day-index').value);const isClosed=document.getElementById('weekly-is-closed').checked;
+  const checked=[...document.querySelectorAll('.weekly-slot-checkbox:checked')].map(c=>c.value);const available_slots=isClosed?[]:checked;
   const semi_max_per_slot={};document.querySelectorAll('.weekly-semi-max-select').forEach(sel=>{semi_max_per_slot[sel.dataset.slot]=parseInt(sel.value);});
-  const{data:ex}=await sbClient.from('weekly_slot_settings').select('id').eq('day_of_week',day).single();
-  if(ex)await sbClient.from('weekly_slot_settings').update({available_slots,is_closed:isClosed,semi_max_per_slot}).eq('day_of_week',day);
+  const{data:existing}=await sbClient.from('weekly_slot_settings').select('id').eq('day_of_week',day).single();
+  if(existing)await sbClient.from('weekly_slot_settings').update({available_slots,is_closed:isClosed,semi_max_per_slot}).eq('day_of_week',day);
   else await sbClient.from('weekly_slot_settings').insert({day_of_week:day,available_slots,is_closed:isClosed,semi_max_per_slot});
   showToast(`${DAY_NAMES[day]}曜日の設定を保存しました`);await loadWeeklySlotList();await renderSlotWeekCalendar();
 }
+
 async function loadWeeklySlotList(){
   const{data}=await sbClient.from('weekly_slot_settings').select('*').order('day_of_week');
   const el=document.getElementById('weekly-slot-list');
-  if(!data||data.length===0){el.innerHTML='<div class="loading">設定がありません</div>';return;}
+  if(!data||!data.length){el.innerHTML='<div class="loading">設定がありません</div>';return;}
   let html='<table><thead><tr><th>曜日</th><th>状態</th><th>受付時間</th></tr></thead><tbody>';
-  for(const s of data){html+=`<tr><td style="font-weight:600;">${DAY_NAMES[s.day_of_week]}曜日</td><td>${s.is_closed?'<span class="badge badge-red">全休</span>':'<span class="badge badge-green">受付あり</span>'}</td><td style="font-size:12px;color:#555;">${s.is_closed?'—':(s.available_slots.join('、')||'—')}</td></tr>`;}
+  for(const s of data){const status=s.is_closed?'<span class="badge badge-red">全休</span>':'<span class="badge badge-green">受付あり</span>';const slots=s.is_closed?'—':(s.available_slots.join('、')||'—');html+=`<tr><td style="font-weight:600;">${DAY_NAMES[s.day_of_week]}曜日</td><td>${status}</td><td style="font-size:12px;color:#555;">${slots}</td></tr>`;}
   html+='</tbody></table>';el.innerHTML=html;
 }
 
-// ========== ★★★ 日付指定・時間帯ブロック（新機能） ★★★ ==========
-
 async function loadSlotSetting(){
-  if(!sbClient)initSupabase();
-  const date=document.getElementById('slot-date').value;
-  if(!date)return;
-
-  // 既存の日付設定を取得
-  const{data:existing}=await sbClient.from('slot_settings').select('*').eq('date',date).single();
-
-  // ★ その曜日の週間テンプレートを取得（デフォルト値として使う）
-  const dow=new Date(date+'T00:00:00').getDay();
-  const{data:weekly}=await sbClient.from('weekly_slot_settings').select('*').eq('day_of_week',dow).single();
-
-  if(!weekly&&!existing){
-    document.getElementById('slot-editor').style.display='none';
-    showToast(`${DAY_NAMES[dow]}曜日の週間テンプレートが設定されていません。先に週間テンプレートを設定してください。`);
-    return;
-  }
-
-  // 週間テンプレートの受付スロット
-  const weeklySlots=weekly?.available_slots||DEFAULT_SLOTS;
-  const weeklyIsClosed=weekly?.is_closed||false;
-  const weeklySemiMax=weekly?.semi_max_per_slot||{};
-
-  // 現在の設定（日付指定があればそちら、なければ週間テンプレート）
-  const isClosed=existing?existing.is_closed:weeklyIsClosed;
-  const activeSlots=existing?existing.available_slots:weeklySlots;
-  const semiMaxPerSlot=existing?(existing.semi_max_per_slot||{}):(weeklySemiMax||{});
-
-  // ★ 状態を保存
-  currentSlotWeeklyAvail=weeklySlots;
-  currentSlotBlocked=weeklySlots.filter(s=>!activeSlots.includes(s));
-
-  // ラベル更新
-  const d=new Date(date+'T00:00:00');
-  document.getElementById('slot-editor-date-label').textContent=`${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
-  document.getElementById('slot-is-closed').checked=isClosed;
-  document.getElementById('slot-reset-btn').style.display=existing?'':'none';
+  if(!sbClient)initSupabase();if(!sbClient){showToast('Supabase未接続');return;}
+  const date=document.getElementById('slot-date').value;if(!date){showToast('日付を選択してください');return;}
+  const{data}=await sbClient.from('slot_settings').select('*').eq('date',date).single();
   document.getElementById('slot-editor').style.display='block';
-
-  // トグルUI描画
-  renderSlotToggleGrid();
-
-  // セミパーソナル定員設定
-  let sh='';
-  for(const slot of weeklySlots){
-    const cur=semiMaxPerSlot[slot]||2;
-    sh+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${slot}</span><select class="form-input slot-semi-max-select" data-slot="${slot}" style="width:120px;"><option value="1" ${cur==1?'selected':''}>1名</option><option value="2" ${cur==2?'selected':''}>2名（通常）</option><option value="3" ${cur==3?'selected':''}>3名</option><option value="4" ${cur==4?'selected':''}>4名</option><option value="6" ${cur==6?'selected':''}>6名</option></select></div>`;
-  }
-  document.getElementById('slot-semi-max-per-slot').innerHTML=sh;
+  const activeSlots=data?.available_slots||DEFAULT_SLOTS;const isClosed=data?.is_closed||false;const semiMaxPerSlot=data?.semi_max_per_slot||{};
+  document.getElementById('slot-is-closed').checked=isClosed;
+  let html='';for(const slot of DEFAULT_SLOTS){const checked=activeSlots.includes(slot)?'checked':'';html+=`<label style="display:flex;align-items:center;gap:6px;font-size:13px;background:#f8f8f8;padding:6px 12px;border-radius:8px;cursor:pointer;"><input type="checkbox" value="${slot}" ${checked} class="slot-checkbox"> ${slot}</label>`;}
+  document.getElementById('slot-checkboxes').innerHTML=html;
+  let shtml='';for(const slot of DEFAULT_SLOTS){const cur=semiMaxPerSlot[slot]||2;shtml+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${slot}</span><select class="form-input slot-semi-max-select" data-slot="${slot}" style="width:120px;"><option value="1" ${cur==1?'selected':''}>1名</option><option value="2" ${cur==2?'selected':''}>2名（通常）</option><option value="3" ${cur==3?'selected':''}>3名</option><option value="4" ${cur==4?'selected':''}>4名</option><option value="6" ${cur==6?'selected':''}>6名</option></select></div>`;}
+  document.getElementById('slot-semi-max-per-slot').innerHTML=shtml;
   await loadSlotList();
 }
 
-// ★ トグルグリッド描画
-function renderSlotToggleGrid(){
-  const isClosed=document.getElementById('slot-is-closed').checked;
-  let html='';
-  for(const slot of DEFAULT_SLOTS){
-    const inTemplate=currentSlotWeeklyAvail.includes(slot);
-    if(!inTemplate){
-      html+=`<div class="slot-toggle-btn inactive" title="週間テンプレートに含まれない時間帯">${slot}</div>`;
-    } else if(isClosed){
-      html+=`<div class="slot-toggle-btn blocked">🚫 ${slot}</div>`;
-    } else if(currentSlotBlocked.includes(slot)){
-      html+=`<div class="slot-toggle-btn blocked" onclick="toggleSlotBlock('${slot}')" title="クリックで解除">🚫 ${slot}</div>`;
-    } else {
-      html+=`<div class="slot-toggle-btn" onclick="toggleSlotBlock('${slot}')" title="クリックで予約不可に">✓ ${slot}</div>`;
-    }
-  }
-  document.getElementById('slot-toggle-grid').innerHTML=html;
-}
-
-// ★ スロットのブロックをトグル
-function toggleSlotBlock(slot){
-  if(currentSlotBlocked.includes(slot))currentSlotBlocked=currentSlotBlocked.filter(s=>s!==slot);
-  else currentSlotBlocked.push(slot);
-  renderSlotToggleGrid();
-}
-
 async function saveSlotSetting(){
-  const date=document.getElementById('slot-date').value;
-  if(!date){showToast('日付を選択してください');return;}
-  const isClosed=document.getElementById('slot-is-closed').checked;
-  // ★ ブロックされていないスロットだけ available_slots に入れる
-  const available_slots=isClosed?[]:currentSlotWeeklyAvail.filter(s=>!currentSlotBlocked.includes(s));
-  const semi_max_per_slot={};
-  document.querySelectorAll('.slot-semi-max-select').forEach(sel=>{semi_max_per_slot[sel.dataset.slot]=parseInt(sel.value);});
+  const date=document.getElementById('slot-date').value;if(!date){showToast('日付を選択してください');return;}
+  const isClosed=document.getElementById('slot-is-closed').checked;const checked=[...document.querySelectorAll('.slot-checkbox:checked')].map(c=>c.value);const available_slots=isClosed?[]:checked;
+  const semi_max_per_slot={};document.querySelectorAll('.slot-semi-max-select').forEach(sel=>{semi_max_per_slot[sel.dataset.slot]=parseInt(sel.value);});
   const{data:existing}=await sbClient.from('slot_settings').select('id').eq('date',date).single();
   if(existing)await sbClient.from('slot_settings').update({available_slots,is_closed:isClosed,semi_max_per_slot}).eq('date',date);
   else await sbClient.from('slot_settings').insert({date,available_slots,is_closed:isClosed,semi_max_per_slot});
-  document.getElementById('slot-reset-btn').style.display='';
   showToast('保存しました');await loadSlotList();await renderSlotWeekCalendar();
-}
-
-// ★ 設定を削除してテンプレートに戻す
-async function resetSlotSetting(){
-  const date=document.getElementById('slot-date').value;
-  if(!confirm(`${date} の個別設定を削除して週間テンプレートに戻しますか？`))return;
-  const{data:ex}=await sbClient.from('slot_settings').select('id').eq('date',date).single();
-  if(ex){
-    await sbClient.from('slot_settings').delete().eq('date',date);
-    showToast('設定を削除しました（週間テンプレートに戻りました）');
-    await loadSlotSetting();await loadSlotList();await renderSlotWeekCalendar();
-  }
 }
 
 async function loadSlotList(){
   const{data}=await sbClient.from('slot_settings').select('*').order('date',{ascending:true});
   const el=document.getElementById('slot-list');
-  if(!data||data.length===0){el.innerHTML='<div class="loading">設定済みの日程はありません</div>';return;}
-  let html='<table><thead><tr><th>日付</th><th>状態</th><th>ブロック中の時間帯</th><th>操作</th></tr></thead><tbody>';
-  for(const s of data){
-    const d=new Date(s.date+'T00:00:00'),dateStr=`${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
-    const status=s.is_closed?'<span class="badge badge-red">全休</span>':'<span class="badge badge-green">受付あり</span>';
-    const blocked=s.is_closed?'全時間帯':(DEFAULT_SLOTS.filter(sl=>!s.available_slots?.includes(sl)).join('、')||'なし');
-    html+=`<tr><td style="font-weight:600;">${dateStr}</td><td>${status}</td><td style="font-size:12px;color:${blocked==='なし'?'#aaa':'#c0392b'};">${blocked}</td><td><button class="btn btn-sm btn-danger" onclick="deleteSlotSetting('${s.id}','${s.date}')">削除</button></td></tr>`;
-  }
+  if(!data||!data.length){el.innerHTML='<div class="loading">設定済みの日程はありません</div>';return;}
+  let html='<table><thead><tr><th>日付</th><th>状態</th><th>受付時間</th><th>操作</th></tr></thead><tbody>';
+  for(const s of data){const d=new Date(s.date);const dn=['日','月','火','水','木','金','土'];const dateStr=`${d.getMonth()+1}月${d.getDate()}日（${dn[d.getDay()]}）`;const status=s.is_closed?'<span class="badge badge-red">全休</span>':'<span class="badge badge-green">受付あり</span>';const slots=s.is_closed?'—':(s.available_slots.join('、')||'—');html+=`<tr><td style="font-weight:600;">${dateStr}</td><td>${status}</td><td style="font-size:12px;color:#555;">${slots}</td><td><button class="btn btn-sm btn-danger" onclick="deleteSlotSetting('${s.id}')">削除</button></td></tr>`;}
   html+='</tbody></table>';el.innerHTML=html;
 }
-async function deleteSlotSetting(id,date){
-  if(!confirm(`${date} の設定を削除しますか？`))return;
-  await sbClient.from('slot_settings').delete().eq('id',id);
-  showToast('削除しました');await loadSlotList();await renderSlotWeekCalendar();
-}
+
+async function deleteSlotSetting(id){if(!confirm('この設定を削除しますか？'))return;await sbClient.from('slot_settings').delete().eq('id',id);showToast('削除しました');await loadSlotList();}
 
 window.addEventListener('DOMContentLoaded',()=>{
-  const URL='https://plapbyvgthymszrzbsgl.supabase.co',KEY='sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
-  document.getElementById('setting-url').value=URL;
-  document.getElementById('setting-key').value=KEY;
-  sbClient=window.supabase.createClient(URL,KEY);
+  const FIXED_URL='https://plapbyvgthymszrzbsgl.supabase.co';
+  const FIXED_KEY='sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
+  document.getElementById('setting-url').value=FIXED_URL;
+  document.getElementById('setting-key').value=FIXED_KEY;
+  sbClient=window.supabase.createClient(FIXED_URL,FIXED_KEY);
   showPage('dashboard',document.querySelector('nav a:first-child'));
   loadAll();
 });
