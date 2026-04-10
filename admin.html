@@ -928,8 +928,14 @@ async function loadSlotList(){
   const{data}=await sbClient.from('slot_settings').select('*').order('date',{ascending:true});
   const el=document.getElementById('slot-list');
   if(!data||!data.length){el.innerHTML='<div class="loading">設定済みの日程はありません</div>';return;}
-  let html='<table><thead><tr><th>日付</th><th>状態</th><th>受付時間</th><th>操作</th></tr></thead><tbody>';
-  for(const s of data){const d=new Date(s.date);const dn=['日','月','火','水','木','金','土'];const dateStr=`${d.getMonth()+1}月${d.getDate()}日（${dn[d.getDay()]}）`;const status=s.is_closed?'<span class="badge badge-red">全休</span>':'<span class="badge badge-green">受付あり</span>';const slots=s.is_closed?'—':(s.available_slots.join('、')||'—');html+=`<tr><td style="font-weight:600;">${dateStr}</td><td>${status}</td><td style="font-size:12px;color:#555;">${slots}</td><td><button class="btn btn-sm btn-danger" onclick="deleteSlotSetting('${s.id}')">削除</button></td></tr>`;}
+  let html='<table><thead><tr><th>日付</th><th>状態</th><th>ブロック中の時間帯</th><th>操作</th></tr></thead><tbody>';
+  for(const s of data){
+    const d=new Date(s.date+'T00:00:00');
+    const dateStr=`${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
+    const status=s.is_closed?'<span class="badge badge-red">全休</span>':'<span class="badge badge-green">受付あり</span>';
+    const blocked=s.is_closed?'全時間帯':(DEFAULT_SLOTS.filter(sl=>!s.available_slots?.includes(sl)).join('、')||'なし');
+    html+=`<tr class="row-clickable" onclick="openSlotQuickEdit('${s.date}','')"><td style="font-weight:600;">${dateStr}</td><td>${status}</td><td style="font-size:12px;color:${blocked==='なし'?'#aaa':'#c0392b'};">${blocked}</td><td onclick="event.stopPropagation()"><button class="btn btn-sm btn-danger" onclick="deleteSlotSetting('${s.id}','${s.date}')">削除</button></td></tr>`;
+  }
   html+='</tbody></table>';el.innerHTML=html;
 }
 
