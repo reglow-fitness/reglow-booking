@@ -14,8 +14,6 @@
     .header-title { color: white; font-size: 16px; font-weight: 600; flex: 1; }
     .screen { display: none; }
     .screen.active { display: block; }
-
-    /* ホーム */
     .home-greeting { background: white; margin: 12px; border-radius: 14px; padding: 18px; }
     .home-name { font-size: 16px; font-weight: 600; }
     .home-sub { font-size: 13px; color: #888; margin-top: 2px; }
@@ -40,8 +38,6 @@
     .history-date { font-size: 11px; color: #aaa; }
     .history-title { font-size: 13px; font-weight: 600; margin-top: 2px; }
     .history-badge { display: inline-block; margin-top: 4px; font-size: 10px; background: #e8f9ef; color: #06C755; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
-
-    /* メニュー選択 */
     .menu-select-card { background: white; margin: 12px; border-radius: 14px; overflow: hidden; }
     .menu-option { padding: 16px; border-bottom: 1px solid #f5f5f5; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.1s; }
     .menu-option:last-child { border-bottom: none; }
@@ -58,8 +54,6 @@
     .menu-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #ddd; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 12px; }
     .menu-check.checked { background: #06C755; border-color: #06C755; }
     .menu-notice { margin: 0 12px 12px; background: #fff8e1; border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #8a6000; line-height: 1.6; }
-
-    /* カレンダー */
     .cal-nav { display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 16px 8px; }
     .cal-month { font-size: 15px; font-weight: 600; }
     .cal-nav-btn { width: 28px; height: 28px; border-radius: 99px; background: #f0f0f0; border: none; font-size: 14px; cursor: pointer; color: #555; }
@@ -79,8 +73,6 @@
     .time-slot { padding: 8px 14px; border-radius: 99px; border: 1.5px solid #e0e0e0; font-size: 13px; color: #333; cursor: pointer; transition: all 0.15s; }
     .time-slot.selected { background: #06C755; border-color: #06C755; color: white; font-weight: 600; }
     .time-slot.full { background: #f5f5f5; color: #ccc; border-color: #eee; cursor: default; text-decoration: line-through; }
-
-    /* 確認・完了 */
     .confirm-card { background: white; margin: 12px; border-radius: 14px; overflow: hidden; }
     .confirm-card-title { padding: 14px 16px 0; font-size: 14px; font-weight: 600; }
     .confirm-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 16px; border-bottom: 1px solid #f5f5f5; }
@@ -96,8 +88,6 @@
     .done-row { display: flex; justify-content: space-between; padding: 6px 0; }
     .done-key { font-size: 13px; color: #888; }
     .done-val { font-size: 13px; font-weight: 600; }
-
-    /* ボタン */
     .cta-btn { display: block; margin: 12px 12px 0; background: #06C755; color: white; border: none; border-radius: 14px; padding: 15px; font-size: 15px; font-weight: 600; width: calc(100% - 24px); cursor: pointer; text-align: center; transition: all 0.15s; }
     .cta-btn:active { transform: scale(0.98); }
     .cta-btn.outline { background: white; color: #06C755; border: 2px solid #06C755; margin-top: 8px; }
@@ -116,7 +106,6 @@
   <div class="header-title" id="header-title">Re:GLOW FITNESS</div>
 </div>
 
-<!-- ホーム -->
 <div class="screen active" id="screen-home">
   <div class="loading" id="home-loading"><div class="loading-spinner"></div>読み込み中...</div>
   <div id="home-content" style="display:none;">
@@ -154,7 +143,6 @@
   </div>
 </div>
 
-<!-- メニュー選択 -->
 <div class="screen" id="screen-menu-select">
   <div style="padding:12px 16px 8px;font-size:13px;color:#888;">ご希望のメニューを選択してください</div>
   <div class="menu-select-card" id="menu-options"></div>
@@ -163,7 +151,6 @@
   <div class="pb"></div>
 </div>
 
-<!-- カレンダー -->
 <div class="screen" id="screen-calendar">
   <div class="cal-nav">
     <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
@@ -186,7 +173,6 @@
   <div class="pb"></div>
 </div>
 
-<!-- 予約確認 -->
 <div class="screen" id="screen-confirm">
   <div class="confirm-card">
     <div class="confirm-card-title">予約内容</div>
@@ -201,7 +187,6 @@
   <div class="pb"></div>
 </div>
 
-<!-- 予約完了 -->
 <div class="screen" id="screen-done">
   <div class="done-wrap">
     <div class="done-circle">
@@ -219,19 +204,16 @@
   <div class="pb"></div>
 </div>
 
-<!-- 予約一覧 -->
 <div class="screen" id="screen-my-bookings">
   <div id="my-bookings-content"><div class="loading"><div class="loading-spinner"></div>読み込み中...</div></div>
   <div class="pb"></div>
 </div>
 
-<!-- 来店履歴 -->
 <div class="screen" id="screen-history">
   <div id="history-content"><div class="loading"><div class="loading-spinner"></div>読み込み中...</div></div>
   <div class="pb"></div>
 </div>
 
-<!-- チケット詳細 -->
 <div class="screen" id="screen-ticket">
   <div id="ticket-detail-content"><div class="loading"><div class="loading-spinner"></div>読み込み中...</div></div>
   <div class="pb"></div>
@@ -289,13 +271,11 @@ async function loadCustomer() {
   if (data && data.length > 0) {
     currentCustomer = data[0];
     const todayStr = new Date().toISOString().slice(0,10);
-    // 1. 今日有効なチケット（valid_from<=today<=expires_at）
     const activeTicket = currentCustomer.tickets?.find(t =>
       (t.plan_type === 'unlimited' || t.remaining_count > 0) &&
       (!t.valid_from || t.valid_from <= todayStr) &&
       (!t.expires_at || t.expires_at >= todayStr)
     );
-    // 2. 将来のチケット（開始日が最も近いもの）
     const futureTicket = currentCustomer.tickets?.filter(t =>
       t.valid_from && t.valid_from > todayStr
     ).sort((a,b) => a.valid_from.localeCompare(b.valid_from))[0];
@@ -308,10 +288,7 @@ async function loadCustomer() {
   renderHome();
 }
 
-// ============================================================
-// ★★★ 追加：指定した日付に有効なチケットを返すヘルパー関数 ★★★
-// 「今日有効か」ではなく「予約日当日に有効か」で判定する
-// ============================================================
+// ★ 指定した日付に有効なチケットを返すヘルパー関数
 function getTicketForDate(dateStr) {
   const tickets = currentCustomer?.tickets || [];
   return tickets.find(t =>
@@ -362,8 +339,12 @@ async function renderMenuSelect() {
 
   for (const menu of allMenus) {
     const isSemi = menu.ticket_cost > 0;
+    // ★ パーソナル体験（チケット不要・予約可能）の判定
+    const isPersonal = menu.ticket_cost === 0 && (menu.name.includes('体験') || menu.max_per_slot === 1);
+    // ★ 自主トレ（チケット必要・セミパーソナル以外）
+    const isJishuTore = menu.ticket_cost === 0 && !isPersonal;
 
-    // ★★★ 修正①：今日有効かではなく「今日以降に有効なチケットが1枚でもあるか」で判定 ★★★
+    // ★ 今日以降に有効期限があるチケットが1枚でもあればOK（将来チケットも含む）
     const todayStr = new Date().toISOString().slice(0,10);
     const hasTicket = !!(currentCustomer?.tickets?.some(t =>
       (t.plan_type === 'unlimited' || t.remaining_count > 0) &&
@@ -380,7 +361,11 @@ async function renderMenuSelect() {
       if (!hasTicket) { disabled = true; disabledReason = 'チケットが必要です'; badgeText = 'チケット必要'; badgeClass = 'badge-red'; }
       else if(currentTicket?.plan_type === 'unlimited') { badgeText = 'プレミアム'; badgeClass = 'badge-green'; }
       else { badgeText = '残' + currentTicket.remaining_count + '回'; badgeClass = 'badge-green'; }
+    } else if (isJishuTore) {
+      if (!hasTicket) { disabled = true; disabledReason = 'チケットが必要です'; badgeText = 'チケット必要'; badgeClass = 'badge-red'; }
+      else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
     } else {
+      // パーソナル体験：チケットなしでも予約可能
       if (!isRegistered) { disabled = true; disabledReason = '顧客登録が必要です'; badgeText = '要登録'; badgeClass = 'badge-red'; }
       else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
     }
@@ -461,22 +446,27 @@ async function selectDate(ds){
 }
 
 async function renderTimeSlots(ds) {
-  const slots = ['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
   const { data: slotSetting } = await sbClient.from('slot_settings').select('*').eq('date', ds).single();
   const dow = new Date(ds).getDay();
   const { data: weeklySetting } = await sbClient.from('weekly_slot_settings').select('*').eq('day_of_week', dow).single();
+
   let availableSlots = null;
   let isClosed = false;
   let semiMaxPerSlot = {};
+  let blockedSlots = []; // ★ 予約不可スロット
+
   if (slotSetting) {
     isClosed = slotSetting.is_closed;
     availableSlots = slotSetting.available_slots;
     semiMaxPerSlot = slotSetting.semi_max_per_slot || {};
+    blockedSlots = slotSetting.blocked_slots || []; // ★
   } else if (weeklySetting) {
     isClosed = weeklySetting.is_closed;
     availableSlots = weeklySetting.available_slots;
     semiMaxPerSlot = weeklySetting.semi_max_per_slot || {};
+    blockedSlots = weeklySetting.blocked_slots || []; // ★
   }
+
   const d=new Date(ds);
   const dn=['日','月','火','水','木','金','土'];
   document.getElementById('time-section-title').textContent=`${d.getMonth()+1}月${d.getDate()}日（${dn[d.getDay()]}）の空き枠`;
@@ -504,7 +494,11 @@ async function renderTimeSlots(ds) {
     document.getElementById('cal-next-btn').style.display = 'none';
     return;
   }
-  const activeSlots = availableSlots && availableSlots.length > 0 ? availableSlots : [];
+
+  // ★ blocked_slots を除外したスロット一覧を作成
+  const baseSlots = availableSlots && availableSlots.length > 0 ? availableSlots : [];
+  const activeSlots = baseSlots.filter(s => !blockedSlots.includes(s));
+
   let html = '';
   for(const slot of activeSlots){
     const [h] = slot.split(':');
@@ -516,7 +510,6 @@ async function renderTimeSlots(ds) {
     const personalCount = slotBookings.filter(b=>b.menus?.max_per_slot===1).length;
     const semiCount = slotBookings.filter(b=>b.menus?.ticket_cost>0 && b.menus?.max_per_slot!==1).length;
     const jiCount = slotBookings.filter(b=>b.menus?.ticket_cost===0&&b.menus?.max_per_slot>1).length;
-    const totalCount = slotBookings.length;
 
     let isFull = false;
     const slotSemiMax = semiMaxPerSlot[slot] || 2;
@@ -541,6 +534,11 @@ async function renderTimeSlots(ds) {
     if(isFull) html+=`<div class="time-slot full">${slot}</div>`;
     else html+=`<div class="time-slot${isSel?' selected':''}" onclick="selectTime('${slot}')">${slot}${remainLabel}</div>`;
   }
+
+  if(activeSlots.length === 0){
+    html = '<div style="color:#aaa;font-size:13px;">この日は予約できる時間帯がありません</div>';
+  }
+
   document.getElementById('time-slots').innerHTML=html;
   document.getElementById('time-section').style.display='block';
   document.getElementById('cal-next-btn').style.display='none';
@@ -561,7 +559,7 @@ function renderConfirm(){
   document.getElementById('confirm-menu').textContent=selectedMenu.name;
   document.getElementById('confirm-datetime').textContent=dtStr;
 
-  // ★★★ 修正②：予約日に有効なチケットで残り回数を表示 ★★★
+  // ★ 予約日に有効なチケットで残り回数を表示
   const bookingTicket = getTicketForDate(selectedDate);
   const isUnlimitedTicket = bookingTicket?.plan_type === 'unlimited';
   if(selectedMenu.ticket_cost>0 && !isUnlimitedTicket){
@@ -578,10 +576,9 @@ async function submitBooking(){
   const btn=document.getElementById('confirm-submit-btn');
   btn.disabled=true;btn.textContent='送信中...';
 
-  // ★★★ 修正③：予約日に有効なチケットを使う ★★★
+  // ★ 予約日に有効なチケットを使う
   const bookingTicket = getTicketForDate(selectedDate);
 
-  // チケット有効期間チェック
   if(selectedMenu.ticket_cost > 0 && bookingTicket){
     const bookingDate = new Date(selectedDate);
     if(bookingTicket.valid_from){
@@ -602,7 +599,6 @@ async function submitBooking(){
       }
     }
   }
-  // セミパーソナルは1日1回チェック
   if(selectedMenu.ticket_cost > 0){
     const startOfDay = new Date(selectedDate+'T00:00:00');
     const endOfDay = new Date(selectedDate+'T23:59:59');
@@ -624,7 +620,7 @@ async function submitBooking(){
   dt.setHours(parseInt(h),parseInt(m),0,0);
   const {data:newBooking, error}=await sbClient.from('bookings').insert({
     customer_id:currentCustomer.id,
-    ticket_id:bookingTicket?.id||null,   // ★ 修正③
+    ticket_id:bookingTicket?.id||null,
     menu_id:selectedMenu.id,
     menu_name:selectedMenu.name,
     scheduled_at:dt.toISOString(),
@@ -632,7 +628,6 @@ async function submitBooking(){
     status:'confirmed'
   }).select('id').single();
   if(error){btn.disabled=false;btn.textContent='予約を確定する';alert('予約に失敗しました。もう一度お試しください。');return;}
-  // GCal登録（バックグラウンド）
   const newBookingId = newBooking?.id;
   if(newBookingId){
     (async()=>{
@@ -648,11 +643,9 @@ async function submitBooking(){
       }catch(e){console.log('GCal error:',e);}
     })();
   }
-  // チケット残数を減らす
-  if(selectedMenu.ticket_cost>0 && bookingTicket && bookingTicket.plan_type!=='unlimited'){  // ★ 修正③
+  if(selectedMenu.ticket_cost>0 && bookingTicket && bookingTicket.plan_type!=='unlimited'){
     const nr=bookingTicket.remaining_count-selectedMenu.ticket_cost;
     await sbClient.from('tickets').update({remaining_count:nr}).eq('id',bookingTicket.id);
-    // DBから再取得してメモリを同期
     const {data: refreshed} = await sbClient.from('customers').select('*, tickets(*)').eq('id', currentCustomer.id).single();
     if(refreshed){
       currentCustomer = refreshed;
@@ -740,7 +733,6 @@ function renderTicketDetail(){
   let html = '';
   for(const t of visibleTickets){
     const isActive = (!t.valid_from || t.valid_from <= todayStr) && (!t.expires_at || t.expires_at >= todayStr);
-    const isFuture = t.valid_from && t.valid_from > todayStr;
     const statusLabel = isActive
       ? '<span style="font-size:11px;background:#e6f7ee;color:#0a7a4a;padding:2px 10px;border-radius:99px;font-weight:600;">有効</span>'
       : '<span style="font-size:11px;background:#e8f1fc;color:#1a56a0;padding:2px 10px;border-radius:99px;font-weight:600;">予定</span>';
