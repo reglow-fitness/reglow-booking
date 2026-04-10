@@ -579,6 +579,15 @@ async function submitBooking(){
   // ★ 予約日に有効なチケットを使う
   const bookingTicket = getTicketForDate(selectedDate);
 
+  // ★ チケットが必要なメニューで、予約日に有効なチケットがない場合はブロック
+  const needsTicket = selectedMenu.ticket_cost > 0 ||
+    (selectedMenu.ticket_cost === 0 && !selectedMenu.name.includes('体験') && selectedMenu.max_per_slot !== 1);
+  if(needsTicket && !bookingTicket){
+    btn.disabled=false; btn.textContent='予約を確定する';
+    alert('選択した日付はチケットの有効期間外です。\nスタッフにお問い合わせください。');
+    return;
+  }
+
   if(selectedMenu.ticket_cost > 0 && bookingTicket){
     const bookingDate = new Date(selectedDate);
     if(bookingTicket.valid_from){
