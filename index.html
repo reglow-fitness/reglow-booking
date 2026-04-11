@@ -285,6 +285,13 @@ async function loadCustomer() {
     currentCustomer = newC;
     currentTicket = null;
   }
+  // ★ ブロックチェック
+  if (currentCustomer?.is_blocked) {
+    document.getElementById('home-loading').style.display = 'none';
+    document.getElementById('home-content').style.display = 'none';
+    document.getElementById('blocked-screen').style.display = 'block';
+    return;
+  }
   renderHome();
 }
 
