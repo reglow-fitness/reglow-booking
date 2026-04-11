@@ -90,7 +90,18 @@
   </style>
 </head>
 <body>
-<div class="layout">
+<!-- ========== ログイン画面 ========== -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">Re:GLOW FITNESS</div>
+    <div class="login-sub">管理画面</div>
+    <input class="login-input" type="password" id="login-password" placeholder="パスワード" onkeydown="if(event.key==='Enter')checkLogin()">
+    <button class="login-btn" onclick="checkLogin()">ログイン</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="layout" id="main-layout" style="display:none;">
   <div class="sidebar">
     <div class="sidebar-logo">
       <h1>Re:GLOW FITNESS</h1>
@@ -267,6 +278,7 @@
     </div>
   </div>
 </div>
+</div><!-- /main-layout -->
 
 <!-- モーダル群 -->
 <div class="modal-overlay" id="modal-add-client" onclick="closeModalOutside(event,'modal-add-client')">
@@ -459,14 +471,16 @@ function renderClients() {
     const periodStart = ticket?.valid_from||null;
     const periodEnd = ticket?.expires_at?.slice(0,10)||null;
     const expiry = periodStart ? `${periodStart} 〜 ${periodEnd||'未設定'}` : (periodEnd||'—');
-    html += `<tr class="row-clickable" onclick="toggleTicketPanel('${c.id}',this)">
-      <td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};">${getInitials(c.name)}</div>${c.name}</div></td>
+    const isBlocked = c.is_blocked || false;
+    html += `<tr class="row-clickable" onclick="toggleTicketPanel('${c.id}',this)" style="${isBlocked?'opacity:0.6;':''}">
+      <td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};">${getInitials(c.name)}</div>${c.name}${isBlocked?' <span class="badge badge-blocked">ブロック中</span>':''}</div></td>
       <td>${planBadge}</td>
       <td>${ticket?(ticket.plan_type==='unlimited'?'<span class="badge badge-green">∞ 無制限</span>':`<div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${barClass}" style="width:${pct}%"></div></div><div class="bar-text">${remaining} / ${total}</div></div>`):'—'}</td>
       <td style="font-size:12px;color:#888;">${expiry}</td>
       <td style="white-space:nowrap;" onclick="event.stopPropagation()">
         <button class="btn btn-sm" style="margin-right:4px;" onclick="openEditNameModal('${c.id}','${c.name}')">名前変更</button>
         <button class="btn btn-sm" style="margin-right:4px;" onclick="openTicketModal('${c.id}','',null)">＋チケット追加</button>
+        <button class="btn btn-sm ${isBlocked?'btn-primary':'btn-danger'}" style="margin-right:4px;" onclick="toggleBlockClient('${c.id}','${c.name}',${isBlocked})">${isBlocked?'ブロック解除':'ブロック'}</button>
         <button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}','${c.name}')">削除</button>
       </td>
     </tr>
@@ -941,6 +955,33 @@ async function loadSlotList(){
 
 async function deleteSlotSetting(id){if(!confirm('この設定を削除しますか？'))return;await sbClient.from('slot_settings').delete().eq('id',id);showToast('削除しました');await loadSlotList();}
 
+
+// ========== ログイン ==========
+const ADMIN_PASSWORD = 'reglow2025';
+function checkLogin() {
+  const pw = document.getElementById('login-password').value;
+  if (pw === ADMIN_PASSWORD) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-layout').style.display = 'flex';
+    loadAll();
+  } else {
+    document.getElementById('login-error').textContent = 'パスワードが違います';
+    document.getElementById('login-password').value = '';
+    setTimeout(() => document.getElementById('login-error').textContent = '', 2000);
+  }
+}
+
+// ========== 顧客ブロック ==========
+async function toggleBlockClient(id, name, isBlocked) {
+  const msg = isBlocked ? `${name} さんのブロックを解除しますか？` : `${name} さんをブロックしますか？
+全メニューの予約ができなくなります。`;
+  if (!confirm(msg)) return;
+  const { error } = await sbClient.from('customers').update({ is_blocked: !isBlocked }).eq('id', id);
+  if (error) { showToast('更新に失敗しました'); return; }
+  showToast(isBlocked ? 'ブロックを解除しました' : `${name} さんをブロックしました`);
+  await loadCustomers();
+}
+
 window.addEventListener('DOMContentLoaded',()=>{
   const FIXED_URL='https://plapbyvgthymszrzbsgl.supabase.co';
   const FIXED_KEY='sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
@@ -948,7 +989,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('setting-key').value=FIXED_KEY;
   sbClient=window.supabase.createClient(FIXED_URL,FIXED_KEY);
   showPage('dashboard',document.querySelector('nav a:first-child'));
-  loadAll();
+  // loadAllはログイン後に実行
 });
 </script>
 </body>
