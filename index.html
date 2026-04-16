@@ -372,8 +372,9 @@ async function renderMenuSelect() {
       if (!hasTicket) { disabled = true; disabledReason = 'チケットが必要です'; badgeText = 'チケット必要'; badgeClass = 'badge-red'; }
       else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
     } else {
-      // パーソナル体験：チケットなしでも予約可能
+      // パーソナル体験：チケットなしの方のみ予約可能
       if (!isRegistered) { disabled = true; disabledReason = '顧客登録が必要です'; badgeText = '要登録'; badgeClass = 'badge-red'; }
+      else if (hasTicket) { disabled = true; disabledReason = 'チケット会員は対象外です'; badgeText = '対象外', badgeClass = 'badge-gray'; }
       else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
     }
 
