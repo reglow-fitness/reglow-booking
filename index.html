@@ -633,9 +633,8 @@ async function submitBooking(){
     return;
   }
 
-  // ★ 1日1回制限（セミパーソナル・自主トレ）
-  const isJishuMenu = selectedMenu.ticket_cost === 0 && !selectedMenu.name.includes('体験') && selectedMenu.max_per_slot !== 1;
-  if(selectedMenu.ticket_cost > 0 || isJishuMenu){
+  // ★ 1日1回制限（セミパーソナル・自主トレ・体験 全メニュー）
+  {
     const startOfDay = new Date(selectedDate+'T00:00:00');
     const endOfDay = new Date(selectedDate+'T23:59:59');
     const {data: existing} = await sbClient.from('bookings')
@@ -647,8 +646,7 @@ async function submitBooking(){
       .lte('scheduled_at', endOfDay.toISOString());
     if(existing && existing.length > 0){
       btn.disabled=false;btn.textContent='予約を確定する';
-      const menuLabel = selectedMenu.ticket_cost > 0 ? 'セミパーソナル' : '自主トレ';
-      alert(`${menuLabel}は1日1回のみ予約できます。`);
+      alert(`${selectedMenu.name}は1日1回のみ予約できます。`);
       return;
     }
   }
