@@ -652,7 +652,7 @@ async function submitBooking(){
   if(newBookingId){
     (async()=>{
       try{
-        const gcalRes = await fetch('https://script.google.com/macros/s/AKfycbxuRunfusrWTJtp_KIEri78ipRY2mHbsC80QR0HifiFdgLCqUCWWQYdYRDQ7MK2dDoU_g/exec',{
+        const gcalRes = await fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec',{
           method:'POST', headers:{'Content-Type':'text/plain'},
           body:JSON.stringify({action:'create', bookingId:newBookingId, customerName:currentCustomer?.name||'Unknown', menuName:selectedMenu.name, startTime:dt.toISOString()})
         });
@@ -705,7 +705,7 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
   }
   const {data:booking}=await sbClient.from('bookings').select('*,menus(ticket_cost),gcal_event_id').eq('id',id).single();
   if(booking?.gcal_event_id){
-    fetch('https://script.google.com/macros/s/AKfycbxuRunfusrWTJtp_KIEri78ipRY2mHbsC80QR0HifiFdgLCqUCWWQYdYRDQ7MK2dDoU_g/exec', {
+    fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec', {
       method: 'POST',
       headers: {'Content-Type': 'text/plain'},
       body: JSON.stringify({action:'delete', eventId: booking.gcal_event_id})
