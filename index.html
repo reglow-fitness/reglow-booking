@@ -616,6 +616,23 @@ async function submitBooking(){
       }
     }
   }
+  // ★ 同一時間帯の重複チェック（全メニュー共通）
+  const [chk_h, chk_m] = selectedTime.split(':');
+  const chkStart = new Date(selectedDate);
+  chkStart.setHours(parseInt(chk_h), parseInt(chk_m), 0, 0);
+  const chkEnd = new Date(chkStart.getTime() + 60 * 1000); // 1分後まで
+  const {data: dupCheck} = await sbClient.from('bookings')
+    .select('id')
+    .eq('customer_id', currentCustomer.id)
+    .eq('status', 'confirmed')
+    .gte('scheduled_at', chkStart.toISOString())
+    .lt('scheduled_at', chkEnd.toISOString());
+  if(dupCheck && dupCheck.length > 0){
+    btn.disabled=false; btn.textContent='予約を確定する';
+    alert('この時間帯はすでに予約済みです。');
+    return;
+  }
+
   // ★ 1日1回制限（セミパーソナル・自主トレ）
   const isJishuMenu = selectedMenu.ticket_cost === 0 && !selectedMenu.name.includes('体験') && selectedMenu.max_per_slot !== 1;
   if(selectedMenu.ticket_cost > 0 || isJishuMenu){
