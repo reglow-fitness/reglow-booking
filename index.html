@@ -461,18 +461,18 @@ async function renderTimeSlots(ds) {
   let availableSlots = null;
   let isClosed = false;
   let semiMaxPerSlot = {};
-  let blockedSlots = []; // ★ 予約不可スロット
+  let blockedSlots = [];
 
   if (slotSetting) {
     isClosed = slotSetting.is_closed;
     availableSlots = slotSetting.available_slots;
     semiMaxPerSlot = slotSetting.semi_max_per_slot || {};
-    blockedSlots = slotSetting.blocked_slots || []; // ★
+    blockedSlots = slotSetting.blocked_slots || [];
   } else if (weeklySetting) {
     isClosed = weeklySetting.is_closed;
     availableSlots = weeklySetting.available_slots;
     semiMaxPerSlot = weeklySetting.semi_max_per_slot || {};
-    blockedSlots = weeklySetting.blocked_slots || []; // ★
+    blockedSlots = weeklySetting.blocked_slots || [];
   }
 
   const d=new Date(ds);
@@ -503,7 +503,6 @@ async function renderTimeSlots(ds) {
     return;
   }
 
-  // ★ blocked_slots を除外したスロット一覧を作成
   const baseSlots = availableSlots && availableSlots.length > 0 ? availableSlots : [];
   const activeSlots = baseSlots.filter(s => !blockedSlots.includes(s));
 
@@ -567,7 +566,6 @@ function renderConfirm(){
   document.getElementById('confirm-menu').textContent=selectedMenu.name;
   document.getElementById('confirm-datetime').textContent=dtStr;
 
-  // ★ 予約日に有効なチケットで残り回数を表示
   const bookingTicket = getTicketForDate(selectedDate);
   const isUnlimitedTicket = bookingTicket?.plan_type === 'unlimited';
   if(selectedMenu.ticket_cost>0 && !isUnlimitedTicket){
@@ -584,10 +582,8 @@ async function submitBooking(){
   const btn=document.getElementById('confirm-submit-btn');
   btn.disabled=true;btn.textContent='送信中...';
 
-  // ★ 予約日に有効なチケットを使う
   const bookingTicket = getTicketForDate(selectedDate);
 
-  // ★ チケットが必要なメニューで、予約日に有効なチケットがない場合はブロック
   const needsTicket = selectedMenu.ticket_cost > 0 ||
     (selectedMenu.ticket_cost === 0 && !selectedMenu.name.includes('体験') && selectedMenu.max_per_slot !== 1);
   if(needsTicket && !bookingTicket){
@@ -616,11 +612,12 @@ async function submitBooking(){
       }
     }
   }
+
   // ★ 同一時間帯の重複チェック（全メニュー共通）
   const [chk_h, chk_m] = selectedTime.split(':');
   const chkStart = new Date(selectedDate);
   chkStart.setHours(parseInt(chk_h), parseInt(chk_m), 0, 0);
-  const chkEnd = new Date(chkStart.getTime() + 60 * 1000); // 1分後まで
+  const chkEnd = new Date(chkStart.getTime() + 60 * 1000);
   const {data: dupCheck} = await sbClient.from('bookings')
     .select('id')
     .eq('customer_id', currentCustomer.id)
@@ -633,23 +630,40 @@ async function submitBooking(){
     return;
   }
 
-  // ★ 1日1回制限（セミパーソナル・自主トレ・体験 全メニュー）
+  // ★ 1日1回制限（セミパーソナルは同種1回、自主トレは同種1回）
   {
     const startOfDay = new Date(selectedDate+'T00:00:00');
     const endOfDay = new Date(selectedDate+'T23:59:59');
     const {data: existing} = await sbClient.from('bookings')
-      .select('id, menu_id')
+      .select('id, menus(ticket_cost, name, max_per_slot)')
       .eq('customer_id', currentCustomer.id)
       .eq('status','confirmed')
-      .eq('menu_id', selectedMenu.id)
       .gte('scheduled_at', startOfDay.toISOString())
       .lte('scheduled_at', endOfDay.toISOString());
-    if(existing && existing.length > 0){
+
+    const isSemiSelected = selectedMenu.ticket_cost > 0;
+    const isJishuSelected = selectedMenu.ticket_cost === 0 &&
+      !selectedMenu.name.includes('体験') && selectedMenu.max_per_slot !== 1;
+
+    const hasSemiBooked = (existing||[]).some(b => b.menus?.ticket_cost > 0);
+    const hasJishuBooked = (existing||[]).some(b =>
+      b.menus?.ticket_cost === 0 &&
+      !b.menus?.name?.includes('体験') &&
+      b.menus?.max_per_slot !== 1
+    );
+
+    if(isSemiSelected && hasSemiBooked){
       btn.disabled=false;btn.textContent='予約を確定する';
-      alert(`${selectedMenu.name}は1日1回のみ予約できます。`);
+      alert('セミパーソナルは1日1回のみ予約できます。');
+      return;
+    }
+    if(isJishuSelected && hasJishuBooked){
+      btn.disabled=false;btn.textContent='予約を確定する';
+      alert('自主トレは1日1回のみ予約できます。');
       return;
     }
   }
+
   const [h,m]=selectedTime.split(':');
   const dt=new Date(selectedDate);
   dt.setHours(parseInt(h),parseInt(m),0,0);
