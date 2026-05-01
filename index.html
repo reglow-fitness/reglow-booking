@@ -838,6 +838,12 @@ function goBack(){
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     document.getElementById(prev).classList.add('active');
     updateHeader(prev);
+    // ★ カレンダー画面に戻った時は時間選択をリセット
+    if(prev === 'screen-calendar') {
+      selectedTime = null;
+      if(selectedDate) renderTimeSlots(selectedDate);
+      document.getElementById('cal-next-btn').style.display = 'none';
+    }
     window.scrollTo(0,0);
   }
 }
