@@ -630,6 +630,13 @@ async function loadBookings() { if(!sbClient)return; currentWeekStart=getWeekSta
 
 async function cancelBooking(id) {
   if (!confirm('この予約をキャンセルしますか？')) return;
+  const { data: booking } = await sbClient.from('bookings').select('*, gcal_event_id').eq('id', id).single();
+  if (booking?.gcal_event_id) {
+    fetch('https://script.google.com/macros/s/AKfycbzBBEQ_e91nn_1nuTaIS2XTs7_Qys36LcipJzSXtkt-mM6WS8UBhNl6IeLNxLHQOdjeuw/exec', {
+      method: 'POST', headers: {'Content-Type': 'text/plain'},
+      body: JSON.stringify({action: 'delete', eventId: booking.gcal_event_id})
+    }).catch(e => console.log('GCal delete error:', e));
+  }
   const { error } = await sbClient.from('bookings').update({status:'cancelled'}).eq('id',id);
   if (error) { showToast('キャンセルに失敗しました'); return; }
   showToast('予約をキャンセルしました');
