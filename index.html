@@ -79,6 +79,11 @@
     .confirm-row:last-child { border-bottom: none; }
     .confirm-key { font-size: 13px; color: #888; }
     .confirm-val { font-size: 13px; font-weight: 600; }
+    /* ★ 日時ハイライトブロック */
+    .confirm-datetime-block { margin: 0 12px 12px; background: #f0fdf4; border: 2px solid #06C755; border-radius: 12px; padding: 14px 16px; text-align: center; }
+    .confirm-datetime-label { font-size: 11px; color: #06C755; font-weight: 600; margin-bottom: 6px; }
+    .confirm-datetime-value { font-size: 22px; font-weight: 700; color: #111; line-height: 1.4; }
+    .confirm-datetime-check { font-size: 12px; color: #888; margin-top: 6px; }
     .confirm-warn { margin: 0 12px 12px; background: #fff8e1; border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #8a6000; line-height: 1.6; }
     .done-wrap { display: flex; flex-direction: column; align-items: center; padding: 36px 20px 20px; }
     .done-circle { width: 64px; height: 64px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
@@ -173,17 +178,23 @@
   <div class="pb"></div>
 </div>
 
+<!-- ★ 確認画面：日時を大きく目立たせる -->
 <div class="screen" id="screen-confirm">
   <div class="confirm-card">
     <div class="confirm-card-title">予約内容</div>
     <div class="confirm-row"><span class="confirm-key">メニュー</span><span class="confirm-val" id="confirm-menu">—</span></div>
-    <div class="confirm-row"><span class="confirm-key">日時</span><span class="confirm-val" id="confirm-datetime">—</span></div>
     <div class="confirm-row"><span class="confirm-key">所要時間</span><span class="confirm-val">60分</span></div>
     <div class="confirm-row"><span class="confirm-key">チケット消化</span><span class="confirm-val" id="confirm-ticket">—</span></div>
   </div>
-  <div class="confirm-warn">キャンセルは予約12時間前まで受け付けます</div>
-  <button class="cta-btn" id="confirm-submit-btn" onclick="submitBooking()">予約を確定する</button>
-  <button class="cta-btn outline" onclick="goScreen('screen-calendar')">日時を変更する</button>
+  <!-- ★ 日時を大きく強調表示 -->
+  <div class="confirm-datetime-block">
+    <div class="confirm-datetime-label">📅 予約日時</div>
+    <div class="confirm-datetime-value" id="confirm-datetime">—</div>
+    <div class="confirm-datetime-check">⚠️ 日時をよくご確認ください</div>
+  </div>
+  <div class="confirm-warn" id="confirm-warn-cancel">キャンセルは予約12時間前まで受け付けます</div>
+  <button class="cta-btn" id="confirm-submit-btn" onclick="submitBooking()">この日時で予約を確定する</button>
+  <button class="cta-btn outline" onclick="goBack()">日時を変更する</button>
   <div class="pb"></div>
 </div>
 
@@ -260,7 +271,6 @@ async function init() {
   allMenus = menus || [];
   await loadCustomer();
 
-  // ★ リッチメニューから直接画面を開く（例: ?screen=my-bookings）
   const params = new URLSearchParams(location.search);
   const screen = params.get('screen');
   if (screen) goScreen('screen-' + screen);
@@ -285,7 +295,6 @@ async function loadCustomer() {
     currentCustomer = newC;
     currentTicket = null;
   }
-  // ★ ブロックチェック
   if (currentCustomer?.is_blocked) {
     document.getElementById('home-loading').style.display = 'none';
     document.getElementById('home-content').style.display = 'none';
@@ -295,7 +304,6 @@ async function loadCustomer() {
   renderHome();
 }
 
-// ★ 指定した日付に有効なチケットを返すヘルパー関数
 function getTicketForDate(dateStr) {
   const tickets = currentCustomer?.tickets || [];
   return tickets.find(t =>
@@ -336,7 +344,6 @@ async function loadRecentHistory() {
   el.innerHTML = data.map(b=>{const dt=new Date(b.scheduled_at);return `<div class="history-item"><div class="history-date">${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日（${dn[dt.getDay()]}）</div><div class="history-title">${b.menu_name||'セミパーソナル60分'}</div><span class="history-badge">完了</span></div>`;}).join('');
 }
 
-// ========== メニュー選択 ==========
 async function renderMenuSelect() {
   const el = document.getElementById('menu-options');
   const notice = document.getElementById('menu-notice');
@@ -346,12 +353,8 @@ async function renderMenuSelect() {
 
   for (const menu of allMenus) {
     const isSemi = menu.ticket_cost > 0;
-    // ★ パーソナル体験（チケット不要・予約可能）の判定
     const isPersonal = menu.ticket_cost === 0 && (menu.name.includes('体験') || menu.max_per_slot === 1);
-    // ★ 自主トレ（チケット必要・セミパーソナル以外）
     const isJishuTore = menu.ticket_cost === 0 && !isPersonal;
-
-    // ★ 今日以降に有効期限があるチケットが1枚でもあればOK（将来チケットも含む）
     const todayStr = new Date().toISOString().slice(0,10);
     const hasTicket = !!(currentCustomer?.tickets?.some(t =>
       (t.plan_type === 'unlimited' || t.remaining_count > 0) &&
@@ -372,7 +375,6 @@ async function renderMenuSelect() {
       if (!hasTicket) { disabled = true; disabledReason = 'チケットが必要です'; badgeText = 'チケット必要'; badgeClass = 'badge-red'; }
       else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
     } else {
-      // パーソナル体験：チケットなしの方のみ予約可能
       if (!isRegistered) { disabled = true; disabledReason = '顧客登録が必要です'; badgeText = '要登録'; badgeClass = 'badge-red'; }
       else if (hasTicket) { disabled = true; disabledReason = 'チケット会員は対象外です'; badgeText = '対象外', badgeClass = 'badge-gray'; }
       else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
@@ -407,7 +409,6 @@ function selectMenu(menu) {
   }
 }
 
-// ========== カレンダー ==========
 function renderCalendar() {
   const mn = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
   document.getElementById('cal-month-label').textContent = calYear+'年 '+mn[calMonth];
@@ -574,7 +575,7 @@ function renderConfirm(){
   } else {
     document.getElementById('confirm-ticket').textContent = isUnlimitedTicket ? '消化なし（無制限プラン）' : '消化なし';
   }
-  const warnEl = document.querySelector('.confirm-warn');
+  const warnEl = document.getElementById('confirm-warn-cancel');
   if(warnEl) warnEl.style.display = (selectedMenu.ticket_cost>0 && !isUnlimitedTicket) ? '' : 'none';
 }
 
@@ -587,7 +588,7 @@ async function submitBooking(){
   const needsTicket = selectedMenu.ticket_cost > 0 ||
     (selectedMenu.ticket_cost === 0 && !selectedMenu.name.includes('体験') && selectedMenu.max_per_slot !== 1);
   if(needsTicket && !bookingTicket){
-    btn.disabled=false; btn.textContent='予約を確定する';
+    btn.disabled=false; btn.textContent='この日時で予約を確定する';
     alert('選択した日付はチケットの有効期間外です。\nスタッフにお問い合わせください。');
     return;
   }
@@ -597,7 +598,7 @@ async function submitBooking(){
     if(bookingTicket.valid_from){
       const vf = new Date(bookingTicket.valid_from); vf.setHours(0,0,0,0);
       if(bookingDate < vf){
-        btn.disabled=false;btn.textContent='予約を確定する';
+        btn.disabled=false;btn.textContent='この日時で予約を確定する';
         alert('チケットの有効期間がまだ始まっていません。スタッフにお問い合わせください。');
         return;
       }
@@ -606,14 +607,13 @@ async function submitBooking(){
       const expiry = new Date(bookingTicket.expires_at);
       expiry.setHours(23,59,59,999);
       if(bookingDate > expiry){
-        btn.disabled=false;btn.textContent='予約を確定する';
+        btn.disabled=false;btn.textContent='この日時で予約を確定する';
         alert('チケットの有効期限が切れています。スタッフにお問い合わせください。');
         return;
       }
     }
   }
 
-  // ★ 同一時間帯の重複チェック（全メニュー共通）
   const [chk_h, chk_m] = selectedTime.split(':');
   const chkStart = new Date(selectedDate);
   chkStart.setHours(parseInt(chk_h), parseInt(chk_m), 0, 0);
@@ -625,12 +625,11 @@ async function submitBooking(){
     .gte('scheduled_at', chkStart.toISOString())
     .lt('scheduled_at', chkEnd.toISOString());
   if(dupCheck && dupCheck.length > 0){
-    btn.disabled=false; btn.textContent='予約を確定する';
+    btn.disabled=false; btn.textContent='この日時で予約を確定する';
     alert('この時間帯はすでに予約済みです。');
     return;
   }
 
-  // ★ 1日1回制限（セミパーソナルは同種1回、自主トレは同種1回）
   {
     const startOfDay = new Date(selectedDate+'T00:00:00');
     const endOfDay = new Date(selectedDate+'T23:59:59');
@@ -653,12 +652,12 @@ async function submitBooking(){
     );
 
     if(isSemiSelected && hasSemiBooked){
-      btn.disabled=false;btn.textContent='予約を確定する';
+      btn.disabled=false;btn.textContent='この日時で予約を確定する';
       alert('セミパーソナルは1日1回のみ予約できます。');
       return;
     }
     if(isJishuSelected && hasJishuBooked){
-      btn.disabled=false;btn.textContent='予約を確定する';
+      btn.disabled=false;btn.textContent='この日時で予約を確定する';
       alert('自主トレは1日1回のみ予約できます。');
       return;
     }
@@ -676,7 +675,7 @@ async function submitBooking(){
     duration_minutes:selectedMenu.duration_minutes,
     status:'confirmed'
   }).select('id').single();
-  if(error){btn.disabled=false;btn.textContent='予約を確定する';alert('予約に失敗しました。もう一度お試しください。');return;}
+  if(error){btn.disabled=false;btn.textContent='この日時で予約を確定する';alert('予約に失敗しました。もう一度お試しください。');return;}
   const newBookingId = newBooking?.id;
   if(newBookingId){
     (async()=>{
@@ -708,8 +707,13 @@ async function submitBooking(){
   document.getElementById('done-menu').textContent=selectedMenu.name;
   document.getElementById('done-datetime').textContent=dtStr;
   document.getElementById('done-remaining').textContent=bookingTicket?(bookingTicket.plan_type==='unlimited'?'無制限':bookingTicket.remaining_count+'回'):'—';
-  try{liff.sendMessages([{type:'text',text:`✅ 予約確定\n📋 ${selectedMenu.name}\n📅 ${dtStr}\n${selectedMenu.ticket_cost>0?'🎫 残り'+bookingTicket.remaining_count+'回\n':''}\n当日お待ちしております！`}]);}catch(e){}
-  btn.disabled=false;btn.textContent='予約を確定する';
+
+  // ★ 改善されたLINEメッセージ（日時を強調）
+  const remainingText = selectedMenu.ticket_cost > 0 && bookingTicket && bookingTicket.plan_type !== 'unlimited'
+    ? `🎫 残り${bookingTicket.remaining_count}回\n` : '';
+  try{liff.sendMessages([{type:'text',text:`✅ 予約が確定しました！\n\n📋 ${selectedMenu.name}\n━━━━━━━━━━\n📅 ${dtStr}\n━━━━━━━━━━\n${remainingText}\n⚠️ 日時をご確認ください\n間違いがある場合は「予約確認」からキャンセルして取り直してください。\n（12時間前まで無料キャンセル可）\n\n当日お待ちしております！`}]);}catch(e){}
+
+  btn.disabled=false;btn.textContent='この日時で予約を確定する';
   goScreen('screen-done');
 }
 
@@ -838,7 +842,6 @@ function goBack(){
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     document.getElementById(prev).classList.add('active');
     updateHeader(prev);
-    // ★ カレンダー画面に戻った時は時間選択をリセット
     if(prev === 'screen-calendar') {
       selectedTime = null;
       if(selectedDate) renderTimeSlots(selectedDate);
