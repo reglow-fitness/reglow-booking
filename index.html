@@ -708,10 +708,20 @@ async function submitBooking(){
   document.getElementById('done-datetime').textContent=dtStr;
   document.getElementById('done-remaining').textContent=bookingTicket?(bookingTicket.plan_type==='unlimited'?'無制限':bookingTicket.remaining_count+'回'):'—';
 
-  // ★ 改善されたLINEメッセージ（日時を強調）
-  const remainingText = selectedMenu.ticket_cost > 0 && bookingTicket && bookingTicket.plan_type !== 'unlimited'
-    ? `🎫 残り${bookingTicket.remaining_count}回\n` : '';
-  try{liff.sendMessages([{type:'text',text:`✅ 予約が確定しました！\n\n📋 ${selectedMenu.name}\n━━━━━━━━━━\n📅 ${dtStr}\n━━━━━━━━━━\n${remainingText}\n⚠️ 日時をご確認ください\n間違いがある場合は「予約確認」からキャンセルして取り直してください。\n（12時間前まで無料キャンセル可）\n\n当日お待ちしております！`}]);}catch(e){}
+ // ★ GAS経由でLINE確定メッセージ送信（体験メニューは持ち物・内容も自動追加）
+  try {
+    fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'sendConfirmation',
+        lineUserId: lineProfile.userId,
+        customerName: currentCustomer.name,
+        menuName: selectedMenu.name,
+        scheduledAt: dt.toISOString()
+      })
+    });
+  } catch(e) { console.log('LINE送信エラー:', e); }
 
   btn.disabled=false;btn.textContent='この日時で予約を確定する';
   goScreen('screen-done');
