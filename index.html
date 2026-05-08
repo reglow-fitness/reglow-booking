@@ -584,8 +584,7 @@ async function submitBooking(){
 
   const bookingTicket = getTicketForDate(selectedDate);
 
-  const needsTicket = selectedMenu.ticket_cost > 0 ||
-    (selectedMenu.ticket_cost === 0 && !selectedMenu.name.includes('体験') && selectedMenu.max_per_slot !== 1);
+  const needsTicket = selectedMenu.ticket_cost > 0;
   if(needsTicket && !bookingTicket){
     btn.disabled=false; btn.textContent='この日時で予約を確定する';
     alert('選択した日付はチケットの有効期間外です。\nスタッフにお問い合わせください。');
