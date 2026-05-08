@@ -51,6 +51,7 @@
     .badge-green { background: #e8f9ef; color: #06C755; }
     .badge-gray { background: #f0f0f0; color: #888; }
     .badge-red { background: #ffeaea; color: #e74c3c; }
+    .badge-amber { background: #fff3cd; color: #9a6800; }
     .menu-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #ddd; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 12px; }
     .menu-check.checked { background: #06C755; border-color: #06C755; }
     .menu-notice { margin: 0 12px 12px; background: #fff8e1; border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #8a6000; line-height: 1.6; }
@@ -79,7 +80,6 @@
     .confirm-row:last-child { border-bottom: none; }
     .confirm-key { font-size: 13px; color: #888; }
     .confirm-val { font-size: 13px; font-weight: 600; }
-    /* ★ 日時ハイライトブロック */
     .confirm-datetime-block { margin: 0 12px 12px; background: #f0fdf4; border: 2px solid #06C755; border-radius: 12px; padding: 14px 16px; text-align: center; }
     .confirm-datetime-label { font-size: 11px; color: #06C755; font-weight: 600; margin-bottom: 6px; }
     .confirm-datetime-value { font-size: 22px; font-weight: 700; color: #111; line-height: 1.4; }
@@ -102,6 +102,9 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .error-box { background: #ffeaea; border-radius: 10px; padding: 14px; margin: 12px; font-size: 13px; color: #c0392b; line-height: 1.6; }
     .pb { padding-bottom: 24px; }
+    /* ★ 空き確認モードバナー */
+    .viewonly-banner { margin: 12px; background: #fff3cd; border: 1.5px solid #f5dda0; border-radius: 12px; padding: 12px 14px; font-size: 13px; color: #8a6000; line-height: 1.7; }
+    .viewonly-banner strong { display: block; margin-bottom: 2px; }
   </style>
 </head>
 <body>
@@ -173,6 +176,11 @@
   <div class="time-section" id="time-section" style="display:none;">
     <div class="time-title" id="time-section-title"></div>
     <div class="time-slots" id="time-slots"></div>
+  </div>
+  <!-- ★ 空き確認モード時のメッセージ -->
+  <div class="viewonly-banner" id="cal-viewonly-msg" style="display:none;">
+    <strong>📋 空き状況の確認のみ可能です</strong>
+    チケットの残数がありません。来月分のご予約はスタッフまでお問い合わせください。
   </div>
   <button class="cta-btn" id="cal-next-btn" style="display:none;" onclick="goScreen('screen-confirm')">この日時で確認する</button>
   <div class="pb"></div>
@@ -250,6 +258,7 @@ let selectedTime = null;
 let calYear, calMonth;
 let screenHistory = [];
 let allMenus = [];
+let isViewOnlyMode = false; // ★ 空き確認モードフラグ
 
 async function init() {
   sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -361,16 +370,32 @@ async function renderMenuSelect() {
       (!t.expires_at || t.expires_at >= todayStr)
     ));
 
+    // ★ 有効期限内だが残数0のチケット（空き確認モード用）
+    const hasZeroTicketInPeriod = !!(currentCustomer?.tickets?.some(t =>
+      t.plan_type !== 'unlimited' &&
+      t.remaining_count === 0 &&
+      (!t.valid_from || t.valid_from <= todayStr) &&
+      (!t.expires_at || t.expires_at >= todayStr)
+    ));
+
     const isRegistered = !!currentCustomer;
     let disabled = false;
+    let viewOnly = false;
     let badgeText = '';
     let badgeClass = 'badge-gray';
     let disabledReason = '';
 
     if (isSemi) {
-      if (!hasTicket) { disabled = true; disabledReason = 'チケットが必要です'; badgeText = 'チケット必要'; badgeClass = 'badge-red'; }
-      else if(currentTicket?.plan_type === 'unlimited') { badgeText = 'プレミアム'; badgeClass = 'badge-green'; }
-      else { badgeText = '残' + currentTicket.remaining_count + '回'; badgeClass = 'badge-green'; }
+      if (hasTicket) {
+        if(currentTicket?.plan_type === 'unlimited') { badgeText = 'プレミアム'; badgeClass = 'badge-green'; }
+        else { badgeText = '残' + currentTicket.remaining_count + '回'; badgeClass = 'badge-green'; }
+      } else if (hasZeroTicketInPeriod) {
+        // ★ 空き確認のみモード：グレーアウトせず選択可能
+        viewOnly = true;
+        badgeText = '空き確認のみ'; badgeClass = 'badge-amber';
+      } else {
+        disabled = true; disabledReason = 'チケットが必要です'; badgeText = 'チケット必要'; badgeClass = 'badge-red';
+      }
     } else if (isJishuTore) {
       const hasValidPeriod = !!(currentCustomer?.tickets?.some(t =>
         (!t.valid_from || t.valid_from <= todayStr) &&
@@ -378,9 +403,9 @@ async function renderMenuSelect() {
       ));
       if (!hasValidPeriod) { disabled = true; disabledReason = 'チケットが必要です'; badgeText = 'チケット必要'; badgeClass = 'badge-red'; }
       else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
-    }else {
+    } else {
       if (!isRegistered) { disabled = true; disabledReason = '顧客登録が必要です'; badgeText = '要登録'; badgeClass = 'badge-red'; }
-      else if (hasTicket) { disabled = true; disabledReason = 'チケット会員は対象外です'; badgeText = '対象外', badgeClass = 'badge-gray'; }
+      else if (hasTicket) { disabled = true; disabledReason = 'チケット会員は対象外です'; badgeText = '対象外'; badgeClass = 'badge-gray'; }
       else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
     }
 
@@ -389,7 +414,7 @@ async function renderMenuSelect() {
     div.className = 'menu-option' + (isSelected?' selected':'') + (disabled?' disabled':'');
     div.innerHTML = `<div class="menu-option-left"><div class="menu-option-name">${menu.name}</div><div class="menu-option-desc">${menu.duration_minutes}分 ${isSemi?'• 1回消化':'• チケット消費なし'}</div></div><span class="menu-option-badge ${badgeClass}">${badgeText}</span><div class="menu-check${isSelected?' checked':''}">${isSelected?'<svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>':''}</div>`;
     if (!disabled) {
-      div.onclick = () => selectMenu(menu);
+      div.onclick = () => selectMenu(menu, viewOnly);
     } else {
       div.title = disabledReason;
     }
@@ -397,15 +422,19 @@ async function renderMenuSelect() {
   }
 }
 
-function selectMenu(menu) {
+function selectMenu(menu, viewOnly = false) {
   selectedMenu = menu;
   selectedDate = null;
   selectedTime = null;
+  isViewOnlyMode = viewOnly; // ★ モードをセット
   renderMenuSelect();
   document.getElementById('menu-next-btn').style.display = 'block';
   const isSemi = menu.ticket_cost > 0;
   const notice = document.getElementById('menu-notice');
-  if (isSemi) {
+  if (viewOnly) {
+    notice.style.display = 'block';
+    notice.textContent = '空き状況のみ確認できます。ご予約はチケット付与後にスタッフまでお問い合わせください。';
+  } else if (isSemi) {
     notice.style.display = 'block';
     notice.textContent = '1回分のチケットが消化されます。予約確定後のキャンセルは12時間前まで受け付けます。';
   } else {
@@ -449,6 +478,7 @@ function changeMonth(dir){
   selectedDate=null;selectedTime=null;
   document.getElementById('time-section').style.display='none';
   document.getElementById('cal-next-btn').style.display='none';
+  document.getElementById('cal-viewonly-msg').style.display='none';
   renderCalendar();
 }
 
@@ -499,12 +529,14 @@ async function renderTimeSlots(ds) {
     document.getElementById('time-slots').innerHTML = '<div style="color:#e74c3c;font-size:13px;">この日は休業日です</div>';
     document.getElementById('time-section').style.display = 'block';
     document.getElementById('cal-next-btn').style.display = 'none';
+    document.getElementById('cal-viewonly-msg').style.display = 'none';
     return;
   }
   if (!slotSetting && !weeklySetting) {
     document.getElementById('time-slots').innerHTML = '<div style="color:#aaa;font-size:13px;">この日は予約を受け付けていません</div>';
     document.getElementById('time-section').style.display = 'block';
     document.getElementById('cal-next-btn').style.display = 'none';
+    document.getElementById('cal-viewonly-msg').style.display = 'none';
     return;
   }
 
@@ -554,12 +586,23 @@ async function renderTimeSlots(ds) {
   document.getElementById('time-slots').innerHTML=html;
   document.getElementById('time-section').style.display='block';
   document.getElementById('cal-next-btn').style.display='none';
+  document.getElementById('cal-viewonly-msg').style.display='none';
 }
 
 function selectTime(t){
   selectedTime=t;
-  document.querySelectorAll('.time-slot').forEach(el=>el.classList.toggle('selected',el.textContent===t));
-  document.getElementById('cal-next-btn').style.display='block';
+  document.querySelectorAll('.time-slot:not(.full)').forEach(el=>{
+    el.classList.toggle('selected', el.textContent.trim().startsWith(t));
+  });
+
+  if(isViewOnlyMode){
+    // ★ 空き確認モード：予約ボタン非表示・メッセージ表示
+    document.getElementById('cal-next-btn').style.display='none';
+    document.getElementById('cal-viewonly-msg').style.display='block';
+  } else {
+    document.getElementById('cal-next-btn').style.display='block';
+    document.getElementById('cal-viewonly-msg').style.display='none';
+  }
   renderConfirm();
 }
 
@@ -711,7 +754,7 @@ async function submitBooking(){
   document.getElementById('done-datetime').textContent=dtStr;
   document.getElementById('done-remaining').textContent=bookingTicket?(bookingTicket.plan_type==='unlimited'?'無制限':bookingTicket.remaining_count+'回'):'—';
 
- // ★ GAS経由でLINE確定メッセージ送信（体験メニューは持ち物・内容も自動追加）
+  // ★ GAS経由でLINE確定メッセージ送信（体験メニューは持ち物・内容も自動追加）
   try {
     fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec', {
       method: 'POST',
@@ -841,7 +884,7 @@ function goScreen(id){
   document.getElementById(id).classList.add('active');
   updateHeader(id);
   if(id==='screen-menu-select')renderMenuSelect();
-  if(id==='screen-calendar')renderCalendar();
+  if(id==='screen-calendar'){renderCalendar();document.getElementById('cal-viewonly-msg').style.display='none';}
   if(id==='screen-my-bookings')loadMyBookings();
   if(id==='screen-history')loadHistory();
   if(id==='screen-ticket')renderTicketDetail();
@@ -859,13 +902,14 @@ function goBack(){
       selectedTime = null;
       if(selectedDate) renderTimeSlots(selectedDate);
       document.getElementById('cal-next-btn').style.display = 'none';
+      document.getElementById('cal-viewonly-msg').style.display = 'none';
     }
     window.scrollTo(0,0);
   }
 }
 
 async function goHome(){
-  screenHistory=[];selectedMenu=null;selectedDate=null;selectedTime=null;
+  screenHistory=[];selectedMenu=null;selectedDate=null;selectedTime=null;isViewOnlyMode=false;
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-home').classList.add('active');
   updateHeader('screen-home');
