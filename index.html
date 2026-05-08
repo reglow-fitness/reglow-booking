@@ -372,9 +372,8 @@ async function renderMenuSelect() {
       else if(currentTicket?.plan_type === 'unlimited') { badgeText = 'プレミアム'; badgeClass = 'badge-green'; }
       else { badgeText = '残' + currentTicket.remaining_count + '回'; badgeClass = 'badge-green'; }
     } else if (isJishuTore) {
-      if (!hasTicket) { disabled = true; disabledReason = 'チケットが必要です'; badgeText = 'チケット必要'; badgeClass = 'badge-red'; }
-      else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
-    } else {
+      badgeText = 'チケット不要'; badgeClass = 'badge-gray';
+    }else {
       if (!isRegistered) { disabled = true; disabledReason = '顧客登録が必要です'; badgeText = '要登録'; badgeClass = 'badge-red'; }
       else if (hasTicket) { disabled = true; disabledReason = 'チケット会員は対象外です'; badgeText = '対象外', badgeClass = 'badge-gray'; }
       else { badgeText = 'チケット不要'; badgeClass = 'badge-gray'; }
