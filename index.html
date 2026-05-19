@@ -102,7 +102,6 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .error-box { background: #ffeaea; border-radius: 10px; padding: 14px; margin: 12px; font-size: 13px; color: #c0392b; line-height: 1.6; }
     .pb { padding-bottom: 24px; }
-    /* ★ 空き確認モードバナー */
     .viewonly-banner { margin: 12px; background: #fff3cd; border: 1.5px solid #f5dda0; border-radius: 12px; padding: 12px 14px; font-size: 13px; color: #8a6000; line-height: 1.7; }
     .viewonly-banner strong { display: block; margin-bottom: 2px; }
   </style>
@@ -177,7 +176,6 @@
     <div class="time-title" id="time-section-title"></div>
     <div class="time-slots" id="time-slots"></div>
   </div>
-  <!-- ★ 空き確認モード時のメッセージ -->
   <div class="viewonly-banner" id="cal-viewonly-msg" style="display:none;">
     <strong>📋 空き状況の確認のみ可能です</strong>
     チケットの残数がありません。来月分のご予約はスタッフまでお問い合わせください。
@@ -186,7 +184,6 @@
   <div class="pb"></div>
 </div>
 
-<!-- ★ 確認画面：日時を大きく目立たせる -->
 <div class="screen" id="screen-confirm">
   <div class="confirm-card">
     <div class="confirm-card-title">予約内容</div>
@@ -194,7 +191,6 @@
     <div class="confirm-row"><span class="confirm-key">所要時間</span><span class="confirm-val">60分</span></div>
     <div class="confirm-row"><span class="confirm-key">チケット消化</span><span class="confirm-val" id="confirm-ticket">—</span></div>
   </div>
-  <!-- ★ 日時を大きく強調表示 -->
   <div class="confirm-datetime-block">
     <div class="confirm-datetime-label">📅 予約日時</div>
     <div class="confirm-datetime-value" id="confirm-datetime">—</div>
@@ -243,7 +239,8 @@ const SUPABASE_URL = 'https://plapbyvgthymszrzbsgl.supabase.co';
 const PLAN_NAMES = {
   '4': 'ライトプラン（月4回）',
   '8': 'レギュラープラン（月8回）',
-  'unlimited': 'プレミアムプラン（無制限）'
+  'unlimited': 'プレミアムプラン（無制限）',
+  'coupon': '回数券' // ★ 追加
 };
 const SUPABASE_KEY = 'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
 const LIFF_ID = '2009580897-CDVPk98y';
@@ -258,7 +255,7 @@ let selectedTime = null;
 let calYear, calMonth;
 let screenHistory = [];
 let allMenus = [];
-let isViewOnlyMode = false; // ★ 空き確認モードフラグ
+let isViewOnlyMode = false;
 
 async function init() {
   sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -322,6 +319,9 @@ function getTicketForDate(dateStr) {
   ) || null;
 }
 
+// ★ クーポンかどうか判定
+function isCouponType(planType) { return planType === 'coupon'; }
+
 function renderHome() {
   document.getElementById('home-loading').style.display = 'none';
   document.getElementById('home-content').style.display = 'block';
@@ -329,9 +329,14 @@ function renderHome() {
   const ta = document.getElementById('ticket-area');
   if (currentTicket) {
     const isUnlimited = currentTicket.plan_type === 'unlimited';
+    const isCoupon = isCouponType(currentTicket.plan_type);
     const periodStr = currentTicket.valid_from ? `${currentTicket.valid_from} 〜 ${currentTicket.expires_at||'未設定'}` : (currentTicket.expires_at || '未設定');
     if (isUnlimited) {
       ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+    } else if (isCoupon) {
+      // ★ 回数券：total_countがnullなのでバーなし
+      const r = currentTicket.remaining_count;
+      ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
     } else {
       const r = currentTicket.remaining_count, t = currentTicket.total_count;
       const pct = Math.round((r/t)*100);
@@ -370,7 +375,6 @@ async function renderMenuSelect() {
       (!t.expires_at || t.expires_at >= todayStr)
     ));
 
-    // ★ 有効期限内だが残数0のチケット（空き確認モード用）
     const hasZeroTicketInPeriod = !!(currentCustomer?.tickets?.some(t =>
       t.plan_type !== 'unlimited' &&
       t.remaining_count === 0 &&
@@ -390,7 +394,6 @@ async function renderMenuSelect() {
         if(currentTicket?.plan_type === 'unlimited') { badgeText = 'プレミアム'; badgeClass = 'badge-green'; }
         else { badgeText = '残' + currentTicket.remaining_count + '回'; badgeClass = 'badge-green'; }
       } else if (hasZeroTicketInPeriod) {
-        // ★ 空き確認のみモード：グレーアウトせず選択可能
         viewOnly = true;
         badgeText = '空き確認のみ'; badgeClass = 'badge-amber';
       } else {
@@ -426,7 +429,7 @@ function selectMenu(menu, viewOnly = false) {
   selectedMenu = menu;
   selectedDate = null;
   selectedTime = null;
-  isViewOnlyMode = viewOnly; // ★ モードをセット
+  isViewOnlyMode = viewOnly;
   renderMenuSelect();
   document.getElementById('menu-next-btn').style.display = 'block';
   const isSemi = menu.ticket_cost > 0;
@@ -463,7 +466,7 @@ function renderCalendar() {
     else if(isSel)cls+=' selected';
     else if(isToday)cls+=' today';
     if(hasSlot&&!isPast)cls+=' has-slot';
-    const click=(!isPast&&hasSlot)?`onclick="selectDate('${ds}')"`:'';
+    const click=(!isPast&&hasSlot)?`onclick="selectDate('${ds}')"`:'';;
     html+=`<div class="${cls}" ${click}>${d}</div>`;
   }
   const rem=7-((firstDay+daysInMonth)%7);
@@ -596,7 +599,6 @@ function selectTime(t){
   });
 
   if(isViewOnlyMode){
-    // ★ 空き確認モード：予約ボタン非表示・メッセージ表示
     document.getElementById('cal-next-btn').style.display='none';
     document.getElementById('cal-viewonly-msg').style.display='block';
   } else {
@@ -754,7 +756,6 @@ async function submitBooking(){
   document.getElementById('done-datetime').textContent=dtStr;
   document.getElementById('done-remaining').textContent=bookingTicket?(bookingTicket.plan_type==='unlimited'?'無制限':bookingTicket.remaining_count+'回'):'—';
 
-  // ★ GAS経由でLINE確定メッセージ送信（体験メニューは持ち物・内容も自動追加）
   try {
     fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec', {
       method: 'POST',
@@ -834,7 +835,7 @@ function renderTicketDetail(){
   const todayStr = new Date().toISOString().slice(0,10);
   const visibleTickets = allTickets.filter(t =>
     !t.expires_at || t.expires_at >= todayStr
-  ).sort((a,b) => (a.valid_from||'').localeCompare(b.valid_from||''));
+  ).sort((a,b) => (a.valid_from||''). localeCompare(b.valid_from||''));
   if(visibleTickets.length === 0){
     el.innerHTML='<div class="loading">チケットが設定されていません<br>スタッフにお問い合わせください</div>';
     return;
@@ -847,17 +848,22 @@ function renderTicketDetail(){
       : '<span style="font-size:11px;background:#e8f1fc;color:#1a56a0;padding:2px 10px;border-radius:99px;font-weight:600;">予定</span>';
     const periodStr = (t.valid_from||'—') + ' 〜 ' + (t.expires_at||'—');
     const isUnlimited = t.plan_type === 'unlimited';
+    const isCoupon = isCouponType(t.plan_type); // ★ 回数券判定
     const planName = PLAN_NAMES[t.plan_type] || t.plan_type;
     let countHtml = '';
     if(isUnlimited){
       countHtml = `<div style="display:flex;align-items:baseline;gap:4px;margin:10px 0 4px;"><span style="font-size:32px;font-weight:600;line-height:1;">∞</span><span style="font-size:13px;color:#888;">制限なし</span></div>`;
+    } else if(isCoupon) {
+      // ★ 回数券：total_countなしでシンプル表示
+      const r = t.remaining_count;
+      countHtml = `<div style="display:flex;align-items:baseline;gap:4px;margin:10px 0 4px;"><span style="font-size:32px;font-weight:600;line-height:1;">${r}</span><span style="font-size:13px;color:#888;">回 残り</span></div>`;
     } else {
       const r=t.remaining_count, total=t.total_count;
       const pct=Math.round((r/total)*100);
       const bc=pct>50?'#06C755':pct>20?'#f0a500':'#e74c3c';
       countHtml = `<div style="display:flex;align-items:baseline;gap:4px;margin:10px 0 4px;"><span style="font-size:32px;font-weight:600;line-height:1;">${r}</span><span style="font-size:13px;color:#888;">回 残り</span><span style="font-size:12px;color:#aaa;margin-left:6px;">/ ${total}回</span></div><div class="ticket-bar-bg" style="margin-bottom:8px;"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div>`;
     }
-    const warnHtml = (!isUnlimited && t.remaining_count <= 3 && isActive)
+    const warnHtml = (!isUnlimited && !isCoupon && t.remaining_count <= 3 && isActive)
       ? '<div style="margin-top:8px;background:#fff8e1;border-radius:10px;padding:8px 10px;font-size:12px;color:#8a6000;">残り回数が少なくなっています</div>' : '';
     const noPenaltyHtml = isUnlimited
       ? '<div style="margin-top:8px;background:#e8f9ef;border-radius:10px;padding:8px 10px;font-size:12px;color:#0a7a4a;">キャンセルペナルティはありません</div>' : '';
