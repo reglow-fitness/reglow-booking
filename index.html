@@ -240,7 +240,7 @@ const PLAN_NAMES = {
   '4': 'ライトプラン（月4回）',
   '8': 'レギュラープラン（月8回）',
   'unlimited': 'プレミアムプラン（無制限）',
-  'coupon': '回数券' // ★ 追加
+  'coupon': '回数券'
 };
 const SUPABASE_KEY = 'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
 const LIFF_ID = '2009580897-CDVPk98y';
@@ -271,7 +271,9 @@ async function init() {
       return;
     }
   } catch(e) {
-    lineProfile = { userId: 'test_user_' + Date.now(), displayName: 'テストユーザー' };
+    // ★ LINEアプリ以外からのアクセスはブロック（テストユーザー問題の修正）
+    document.getElementById('home-loading').innerHTML = '<div style="padding:40px 20px;text-align:center;color:#888;font-size:15px;line-height:1.8;">このページはLINEアプリ内でご利用ください。<br><br>📱 LINEのメニューから<br>「予約する」をタップしてください。</div>';
+    return;
   }
   const { data: menus } = await sbClient.from('menus').select('*').eq('is_active', true).order('sort_order');
   allMenus = menus || [];
@@ -312,14 +314,15 @@ async function loadCustomer() {
 
 function getTicketForDate(dateStr) {
   const tickets = currentCustomer?.tickets || [];
-  return tickets.find(t =>
+  const valid = tickets.filter(t =>
     (t.plan_type === 'unlimited' || t.remaining_count > 0) &&
     (!t.valid_from  || t.valid_from  <= dateStr) &&
     (!t.expires_at  || t.expires_at  >= dateStr)
-  ) || null;
+  );
+  // ★ プランチケット優先、なければ回数券
+  return valid.find(t => t.plan_type !== 'coupon') || valid.find(t => t.plan_type === 'coupon') || null;
 }
 
-// ★ クーポンかどうか判定
 function isCouponType(planType) { return planType === 'coupon'; }
 
 function renderHome() {
@@ -334,7 +337,6 @@ function renderHome() {
     if (isUnlimited) {
       ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
     } else if (isCoupon) {
-      // ★ 回数券：total_countがnullなのでバーなし
       const r = currentTicket.remaining_count;
       ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
     } else {
@@ -466,7 +468,7 @@ function renderCalendar() {
     else if(isSel)cls+=' selected';
     else if(isToday)cls+=' today';
     if(hasSlot&&!isPast)cls+=' has-slot';
-    const click=(!isPast&&hasSlot)?`onclick="selectDate('${ds}')"`:'';;
+    const click=(!isPast&&hasSlot)?`onclick="selectDate('${ds}')"`:'';
     html+=`<div class="${cls}" ${click}>${d}</div>`;
   }
   const rem=7-((firstDay+daysInMonth)%7);
@@ -835,7 +837,7 @@ function renderTicketDetail(){
   const todayStr = new Date().toISOString().slice(0,10);
   const visibleTickets = allTickets.filter(t =>
     !t.expires_at || t.expires_at >= todayStr
-  ).sort((a,b) => (a.valid_from||''). localeCompare(b.valid_from||''));
+  ).sort((a,b) => (a.valid_from||'').localeCompare(b.valid_from||''));
   if(visibleTickets.length === 0){
     el.innerHTML='<div class="loading">チケットが設定されていません<br>スタッフにお問い合わせください</div>';
     return;
@@ -848,13 +850,12 @@ function renderTicketDetail(){
       : '<span style="font-size:11px;background:#e8f1fc;color:#1a56a0;padding:2px 10px;border-radius:99px;font-weight:600;">予定</span>';
     const periodStr = (t.valid_from||'—') + ' 〜 ' + (t.expires_at||'—');
     const isUnlimited = t.plan_type === 'unlimited';
-    const isCoupon = isCouponType(t.plan_type); // ★ 回数券判定
+    const isCoupon = isCouponType(t.plan_type);
     const planName = PLAN_NAMES[t.plan_type] || t.plan_type;
     let countHtml = '';
     if(isUnlimited){
       countHtml = `<div style="display:flex;align-items:baseline;gap:4px;margin:10px 0 4px;"><span style="font-size:32px;font-weight:600;line-height:1;">∞</span><span style="font-size:13px;color:#888;">制限なし</span></div>`;
     } else if(isCoupon) {
-      // ★ 回数券：total_countなしでシンプル表示
       const r = t.remaining_count;
       countHtml = `<div style="display:flex;align-items:baseline;gap:4px;margin:10px 0 4px;"><span style="font-size:32px;font-weight:600;line-height:1;">${r}</span><span style="font-size:13px;color:#888;">回 残り</span></div>`;
     } else {
