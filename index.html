@@ -330,21 +330,38 @@ function renderHome() {
   document.getElementById('home-content').style.display = 'block';
   document.getElementById('user-name').textContent = (currentCustomer?.name || '') + ' さん';
   const ta = document.getElementById('ticket-area');
-  if (currentTicket) {
-    const isUnlimited = currentTicket.plan_type === 'unlimited';
-    const isCoupon = isCouponType(currentTicket.plan_type);
-    const periodStr = currentTicket.valid_from ? `${currentTicket.valid_from} 〜 ${currentTicket.expires_at||'未設定'}` : (currentTicket.expires_at || '未設定');
-    if (isUnlimited) {
-      ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
-    } else if (isCoupon) {
-      const r = currentTicket.remaining_count;
-      ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
-    } else {
-      const r = currentTicket.remaining_count, t = currentTicket.total_count;
-      const pct = Math.round((r/t)*100);
-      const bc = pct > 50 ? '#06C755' : pct > 20 ? '#f0a500' : '#e74c3c';
-      ta.innerHTML = `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[currentTicket.plan_type]||currentTicket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-bar-bg"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+  const todayStr = new Date().toISOString().slice(0,10);
+
+  // ★ 有効なチケットを全件表示（プラン→回数券の順）
+  const activeTickets = (currentCustomer?.tickets || []).filter(t =>
+    (!t.valid_from || t.valid_from <= todayStr) &&
+    (!t.expires_at || t.expires_at >= todayStr)
+  ).sort((a, b) => {
+    // プランチケットを先に、回数券を後に
+    if (isCouponType(a.plan_type) && !isCouponType(b.plan_type)) return 1;
+    if (!isCouponType(a.plan_type) && isCouponType(b.plan_type)) return -1;
+    return 0;
+  });
+
+  if (activeTickets.length > 0) {
+    let html = '';
+    for (const ticket of activeTickets) {
+      const isUnlimited = ticket.plan_type === 'unlimited';
+      const isCoupon = isCouponType(ticket.plan_type);
+      const periodStr = ticket.valid_from ? `${ticket.valid_from} 〜 ${ticket.expires_at||'未設定'}` : (ticket.expires_at || '未設定');
+      if (isUnlimited) {
+        html += `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+      } else if (isCoupon) {
+        const r = ticket.remaining_count;
+        html += `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+      } else {
+        const r = ticket.remaining_count, total = ticket.total_count;
+        const pct = Math.round((r/total)*100);
+        const bc = pct > 50 ? '#06C755' : pct > 20 ? '#f0a500' : '#e74c3c';
+        html += `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-bar-bg"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+      }
     }
+    ta.innerHTML = html;
   } else {
     ta.innerHTML = `<div class="ticket-block"><div class="no-ticket">チケットが設定されていません<br>スタッフにお問い合わせください</div></div>`;
   }
