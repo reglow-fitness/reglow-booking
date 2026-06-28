@@ -730,6 +730,35 @@ async function submitBooking(){
     }
   }
 
+  // ★ 同時間帯の他のお客様の予約数を再チェック（同時予約による重複防止）
+  {
+    const isPersonalMenu = selectedMenu.ticket_cost === 0 && selectedMenu.max_per_slot === 1;
+    const isSemiMenu = selectedMenu.ticket_cost > 0;
+    const [ch, cm] = selectedTime.split(':');
+    const slotStart = new Date(selectedDate);
+    slotStart.setHours(parseInt(ch), parseInt(cm), 0, 0);
+    const slotEnd = new Date(slotStart.getTime() + 59 * 60 * 1000);
+    const { data: slotBookings } = await sbClient.from('bookings')
+      .select('id, menus(ticket_cost, max_per_slot)')
+      .eq('status', 'confirmed')
+      .gte('scheduled_at', slotStart.toISOString())
+      .lte('scheduled_at', slotEnd.toISOString());
+
+    const personalCount = (slotBookings || []).filter(b => b.menus?.max_per_slot === 1).length;
+    const semiCount = (slotBookings || []).filter(b => b.menus?.ticket_cost > 0 && b.menus?.max_per_slot !== 1).length;
+
+    if (isPersonalMenu && personalCount >= 1) {
+      btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
+      alert('申し訳ございません。この時間帯はすでに体験予約が入っております。\n別の時間をお選びください。');
+      return;
+    }
+    if (isSemiMenu && personalCount > 0) {
+      btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
+      alert('申し訳ございません。この時間帯は体験予約のため埋まっております。\n別の時間をお選びください。');
+      return;
+    }
+  }
+
   const [h,m]=selectedTime.split(':');
   const dt=new Date(selectedDate);
   dt.setHours(parseInt(h),parseInt(m),0,0);
