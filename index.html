@@ -178,7 +178,7 @@
   </div>
   <div class="viewonly-banner" id="cal-viewonly-msg" style="display:none;">
     <strong>📋 空き状況の確認のみ可能です</strong>
-    チケットの残数がありません。来月分のご予約はスタッフまでお問い合わせください。
+    チケットの残数がありません。予定分のご予約はスタッフまでお問い合わせください。
   </div>
   <button class="cta-btn" id="cal-next-btn" style="display:none;" onclick="goScreen('screen-confirm')">この日時で確認する</button>
   <div class="pb"></div>
@@ -336,7 +336,7 @@ function renderHome() {
   const activeTickets = (currentCustomer?.tickets || []).filter(t =>
     (!t.expires_at || t.expires_at >= todayStr)
   ).sort((a, b) => {
-    // 有効中を先に、予定（来月分）を後に
+    // 有効中を先に、予定（予定分）を後に
     const aActive = !a.valid_from || a.valid_from <= todayStr;
     const bActive = !b.valid_from || b.valid_from <= todayStr;
     if (aActive && !bActive) return -1;
@@ -355,7 +355,7 @@ function renderHome() {
       const isFuture = ticket.valid_from && ticket.valid_from > todayStr;
       const periodStr = ticket.valid_from ? `${ticket.valid_from} 〜 ${ticket.expires_at||'未設定'}` : (ticket.expires_at || '未設定');
       const blockStyle = isFuture ? 'background:#f0f0f0;opacity:0.75;' : '';
-      const futureBadge = isFuture ? '<span style="font-size:10px;background:#e8f1fc;color:#1a56a0;padding:2px 8px;border-radius:99px;font-weight:600;margin-left:6px;">来月分</span>' : '';
+      const futureBadge = isFuture ? '<span style="font-size:10px;background:#e8f1fc;color:#1a56a0;padding:2px 8px;border-radius:99px;font-weight:600;margin-left:6px;">予定分</span>' : '';
       if (isUnlimited) {
         html += `<div class="ticket-block" style="${blockStyle}"><div class="ticket-type-label">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}${futureBadge}</div><div class="ticket-count-row"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
       } else if (isCoupon) {
