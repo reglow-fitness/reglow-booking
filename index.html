@@ -334,10 +334,14 @@ function renderHome() {
 
   // ★ 有効なチケットを全件表示（プラン→回数券の順）
   const activeTickets = (currentCustomer?.tickets || []).filter(t =>
-    (!t.valid_from || t.valid_from <= todayStr) &&
     (!t.expires_at || t.expires_at >= todayStr)
   ).sort((a, b) => {
-    // プランチケットを先に、回数券を後に
+    // 有効中を先に、予定（来月分）を後に
+    const aActive = !a.valid_from || a.valid_from <= todayStr;
+    const bActive = !b.valid_from || b.valid_from <= todayStr;
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+    // 同じ状態ならプランチケットを先に、回数券を後に
     if (isCouponType(a.plan_type) && !isCouponType(b.plan_type)) return 1;
     if (!isCouponType(a.plan_type) && isCouponType(b.plan_type)) return -1;
     return 0;
@@ -348,17 +352,20 @@ function renderHome() {
     for (const ticket of activeTickets) {
       const isUnlimited = ticket.plan_type === 'unlimited';
       const isCoupon = isCouponType(ticket.plan_type);
+      const isFuture = ticket.valid_from && ticket.valid_from > todayStr;
       const periodStr = ticket.valid_from ? `${ticket.valid_from} 〜 ${ticket.expires_at||'未設定'}` : (ticket.expires_at || '未設定');
+      const blockStyle = isFuture ? 'background:#f0f0f0;opacity:0.75;' : '';
+      const futureBadge = isFuture ? '<span style="font-size:10px;background:#e8f1fc;color:#1a56a0;padding:2px 8px;border-radius:99px;font-weight:600;margin-left:6px;">来月分</span>' : '';
       if (isUnlimited) {
-        html += `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+        html += `<div class="ticket-block" style="${blockStyle}"><div class="ticket-type-label">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}${futureBadge}</div><div class="ticket-count-row"><span class="ticket-big">∞</span><span class="ticket-unit">制限なし</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
       } else if (isCoupon) {
         const r = ticket.remaining_count;
-        html += `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+        html += `<div class="ticket-block" style="${blockStyle}"><div class="ticket-type-label">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}${futureBadge}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
       } else {
         const r = ticket.remaining_count, total = ticket.total_count;
         const pct = Math.round((r/total)*100);
         const bc = pct > 50 ? '#06C755' : pct > 20 ? '#f0a500' : '#e74c3c';
-        html += `<div class="ticket-block"><div class="ticket-type-label">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div><div class="ticket-bar-bg"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div><div class="ticket-exp">有効期間：${periodStr}</div></div>`;
+        html += `<div class="ticket-block" style="${blockStyle}"><div class="ticket-type-label">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}${futureBadge}</div><div class="ticket-count-row"><span class="ticket-big">${r}</span><span class="ticket-unit">回 残り</span></div>${!isFuture?`<div class="ticket-bar-bg"><div class="ticket-bar-fill" style="width:${pct}%;background:${bc};"></div></div>`:''}<div class="ticket-exp">有効期間：${periodStr}</div></div>`;
       }
     }
     ta.innerHTML = html;
