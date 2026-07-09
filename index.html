@@ -594,8 +594,11 @@ async function renderTimeSlots(ds) {
       if(semiCount > 0) isFull = true;
       if(personalCount >= 1) isFull = true;
     } else {
-      if(jiCount >= 2) isFull = true;
-      if(semiCount + jiCount >= 4) isFull = true;
+      // ★ 自主トレ上限：セミパーソナル定員に応じて変動
+      // 定員2→自主トレ最大2、定員3→自主トレ最大1、定員4以上→自主トレ不可
+      const jiMax = slotSemiMax >= 4 ? 0 : slotSemiMax >= 3 ? 1 : 2;
+      if(jiMax === 0) isFull = true;
+      else if(jiCount >= jiMax) isFull = true;
     }
 
     const isSel = selectedTime===slot;
@@ -753,6 +756,8 @@ async function submitBooking(){
 
     const personalCount = (slotBookings || []).filter(b => b.menus?.max_per_slot === 1).length;
     const semiCount = (slotBookings || []).filter(b => b.menus?.ticket_cost > 0 && b.menus?.max_per_slot !== 1).length;
+    const jiCount2 = (slotBookings || []).filter(b => b.menus?.ticket_cost === 0 && b.menus?.max_per_slot !== 1).length;
+    const isJishuMenu = selectedMenu.ticket_cost === 0 && !selectedMenu.name.includes('体験') && selectedMenu.max_per_slot !== 1;
 
     if (isPersonalMenu && personalCount >= 1) {
       btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
@@ -763,6 +768,23 @@ async function submitBooking(){
       btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
       alert('申し訳ございません。この時間帯は体験予約のため埋まっております。\n別の時間をお選びください。');
       return;
+    }
+    if (isJishuMenu) {
+      // ★ 自主トレ：セミパーソナル定員に応じた上限チェック
+      const { data: slotCfg } = await sbClient.from('slot_settings').select('semi_max_per_slot').eq('date', selectedDate).single();
+      const { data: weeklyCfg } = await sbClient.from('weekly_slot_settings').select('semi_max_per_slot').eq('day_of_week', new Date(selectedDate).getDay()).single();
+      const cfgSemiMax = (slotCfg?.semi_max_per_slot?.[selectedTime] || weeklyCfg?.semi_max_per_slot?.[selectedTime] || 2);
+      const jiMax = cfgSemiMax >= 4 ? 0 : cfgSemiMax >= 3 ? 1 : 2;
+      if (jiMax === 0) {
+        btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
+        alert('この時間帯は自主トレの予約をお受けできません。');
+        return;
+      }
+      if (jiCount2 >= jiMax) {
+        btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
+        alert('この時間帯の自主トレ予約は満席です。');
+        return;
+      }
     }
   }
 
