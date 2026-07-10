@@ -881,10 +881,14 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
   await sbClient.from('bookings').update({status:'cancelled'}).eq('id',id);
   if(booking?.ticket_id){
     const {data:latestTicket} = await sbClient.from('tickets').select('*').eq('id',booking.ticket_id).single();
-    if(latestTicket && latestTicket.plan_type !== 'unlimited' && latestTicket.total_count > 0){
+    if(latestTicket && latestTicket.plan_type !== 'unlimited'){
       const diffH = (new Date(scheduledAt) - new Date()) / (1000 * 60 * 60);
       if(diffH >= 12){
-        const newRemaining = Math.min((latestTicket.remaining_count||0) + 1, latestTicket.total_count);
+        const isCouponTicket = latestTicket.plan_type === 'coupon';
+        // ★ 回数券はtotal_countがnullなので上限なしで戻す、通常プランはtotal_count以内で戻す
+        const newRemaining = isCouponTicket
+          ? (latestTicket.remaining_count||0) + 1
+          : Math.min((latestTicket.remaining_count||0) + 1, latestTicket.total_count);
         await sbClient.from('tickets').update({remaining_count: newRemaining}).eq('id', latestTicket.id);
       }
     }
