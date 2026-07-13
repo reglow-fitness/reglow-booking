@@ -607,8 +607,12 @@ async function renderTimeSlots(ds) {
       const remain = slotSemiMax - semiCount;
       remainLabel = `<span style="font-size:10px;opacity:0.75;margin-left:3px;">残${remain}</span>`;
     }
-    if(isFull) html+=`<div class="time-slot full">${slot}</div>`;
-    else html+=`<div class="time-slot${isSel?' selected':''}" onclick="selectTime('${slot}')">${slot}${remainLabel}</div>`;
+    // ★ 1対3枠バッジ
+    const trioBadge = slotSemiMax === 3
+      ? `<span style="font-size:9px;background:#e8f1fc;color:#1a56a0;padding:1px 5px;border-radius:99px;font-weight:700;margin-left:4px;vertical-align:middle;">1対3</span>`
+      : '';
+    if(isFull) html+=`<div class="time-slot full">${slot}${trioBadge}</div>`;
+    else html+=`<div class="time-slot${isSel?' selected':''}" onclick="selectTime('${slot}')">${slot}${remainLabel}${trioBadge}</div>`;
   }
 
   if(activeSlots.length === 0){
