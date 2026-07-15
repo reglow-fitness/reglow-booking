@@ -290,6 +290,16 @@
         <button class="btn btn-primary" onclick="saveSettings()">保存して接続</button>
         <p id="setting-status" style="margin-top:10px;font-size:13px;color:#06C755;"></p>
       </div>
+      <!-- ★ 期限切れチケット一括削除 -->
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:8px;">🗑 期限切れチケットの削除</strong>
+        <p style="font-size:13px;color:#888;margin-bottom:14px;line-height:1.7;">有効期限が過ぎたチケットを一括で削除します。<br>削除後は元に戻せません。予約データには影響しません。</p>
+        <div id="expired-ticket-preview" style="margin-bottom:12px;font-size:13px;color:#555;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn" onclick="previewExpiredTickets()">🔍 対象を確認する</button>
+          <button class="btn btn-danger" id="delete-expired-btn" style="display:none;" onclick="deleteExpiredTickets()">🗑 期限切れを一括削除する</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -694,6 +704,42 @@ async function deleteSlotSetting(id){if(!confirm('この設定を削除します
 
 const ADMIN_PASSWORD='reglow2025';
 function checkLogin(){const pw=document.getElementById('login-password').value;if(pw===ADMIN_PASSWORD){document.getElementById('login-screen').style.display='none';document.getElementById('main-layout').style.display='flex';loadAll();}else{document.getElementById('login-error').textContent='パスワードが違います';document.getElementById('login-password').value='';setTimeout(()=>document.getElementById('login-error').textContent='',2000);}}
+// ★ 期限切れチケット確認・削除
+async function previewExpiredTickets(){
+  if(!sbClient){showToast('Supabaseが未接続です');return;}
+  const todayStr=new Date().toISOString().slice(0,10);
+  const{data,error}=await sbClient.from('tickets').select('*, customers(name)').lt('expires_at',todayStr);
+  const el=document.getElementById('expired-ticket-preview');
+  const btn=document.getElementById('delete-expired-btn');
+  if(error||!data||data.length===0){
+    el.innerHTML='<span style="color:#06C755;">✅ 期限切れのチケットはありません</span>';
+    btn.style.display='none';
+    return;
+  }
+  let html=`<div style="background:#ffeaea;border-radius:8px;padding:10px 14px;margin-bottom:8px;"><strong style="color:#c0392b;">対象：${data.length}件</strong></div>`;
+  html+='<div style="max-height:160px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:8px;">';
+  for(const t of data){
+    html+=`<div style="padding:5px 4px;border-bottom:1px solid #f5f5f5;font-size:12px;display:flex;justify-content:space-between;"><span>${t.customers?.name||'—'}</span><span style="color:#888;">${PLAN_NAMES[t.plan_type]||t.plan_type}　${t.expires_at||'—'}まで</span></div>`;
+  }
+  html+='</div>';
+  el.innerHTML=html;
+  btn.style.display='';
+}
+
+async function deleteExpiredTickets(){
+  const todayStr=new Date().toISOString().slice(0,10);
+  const{data}=await sbClient.from('tickets').select('id').lt('expires_at',todayStr);
+  if(!data||data.length===0){showToast('対象がありません');return;}
+  if(!confirm(`期限切れのチケット ${data.length}件 を削除しますか？
+元に戻せません。`))return;
+  const{error}=await sbClient.from('tickets').delete().lt('expires_at',todayStr);
+  if(error){showToast('削除に失敗しました');return;}
+  document.getElementById('expired-ticket-preview').innerHTML='<span style="color:#06C755;">✅ 削除しました</span>';
+  document.getElementById('delete-expired-btn').style.display='none';
+  showToast(`${data.length}件の期限切れチケットを削除しました`);
+  await loadCustomers();
+}
+
 async function toggleBlockClient(id,name,isBlocked){const msg=isBlocked?`${name} さんのブロックを解除しますか？`:`${name} さんをブロックしますか？\n全メニューの予約ができなくなります。`;if(!confirm(msg))return;const{error}=await sbClient.from('customers').update({is_blocked:!isBlocked}).eq('id',id);if(error){showToast('更新に失敗しました');return;}showToast(isBlocked?'ブロックを解除しました':`${name} さんをブロックしました`);await loadCustomers();}
 
 window.addEventListener('DOMContentLoaded',()=>{
