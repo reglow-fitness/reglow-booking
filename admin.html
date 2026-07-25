@@ -292,6 +292,16 @@
         <button class="btn btn-primary" onclick="saveSettings()">保存して接続</button>
         <p id="setting-status" style="margin-top:10px;font-size:13px;color:#06C755;"></p>
       </div>
+      <!-- ★ 先月以前の予約枠設定を一括削除 -->
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:8px;">🗓 古い予約枠設定の削除</strong>
+        <p style="font-size:13px;color:#888;margin-bottom:14px;line-height:1.7;">先月以前の日付指定設定を一括で削除します。<br>今月・来月以降の設定には影響しません。</p>
+        <div id="old-slot-preview" style="margin-bottom:12px;font-size:13px;color:#555;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn" onclick="previewOldSlots()">🔍 対象を確認する</button>
+          <button class="btn btn-danger" id="delete-old-slots-btn" style="display:none;" onclick="deleteOldSlots()">🗑 先月以前を一括削除する</button>
+        </div>
+      </div>
       <!-- ★ 期限切れチケット一括削除 -->
       <div class="card">
         <strong style="font-size:14px;display:block;margin-bottom:8px;">🗑 期限切れチケットの削除</strong>
@@ -729,6 +739,37 @@ async function deleteSlotSetting(id){if(!confirm('この設定を削除します
 const ADMIN_PASSWORD='reglow2025';
 function checkLogin(){const pw=document.getElementById('login-password').value;if(pw===ADMIN_PASSWORD){document.getElementById('login-screen').style.display='none';document.getElementById('main-layout').style.display='flex';loadAll();}else{document.getElementById('login-error').textContent='パスワードが違います';document.getElementById('login-password').value='';setTimeout(()=>document.getElementById('login-error').textContent='',2000);}}
 // ★ 期限切れチケット確認・削除
+// ★ 先月以前の予約枠設定確認・削除
+async function previewOldSlots(){
+  if(!sbClient){showToast('Supabaseが未接続です');return;}
+  const now=new Date();
+  const thisMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  const{data,error}=await sbClient.from('slot_settings').select('date,is_closed').lt('date',thisMonth).order('date',{ascending:true});
+  const el=document.getElementById('old-slot-preview');
+  const btn=document.getElementById('delete-old-slots-btn');
+  if(error||!data||data.length===0){
+    el.innerHTML='<span style="color:#06C755;">✅ 先月以前の設定はありません</span>';
+    btn.style.display='none';
+    return;
+  }
+  let html=`<div style="background:#ffeaea;border-radius:8px;padding:10px 14px;margin-bottom:8px;"><strong style="color:#c0392b;">対象：${data.length}件</strong>（${data[0].date} 〜 ${data[data.length-1].date}）</div>`;
+  btn.style.display='';
+  el.innerHTML=html;
+}
+
+async function deleteOldSlots(){
+  const now=new Date();
+  const thisMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  const{data}=await sbClient.from('slot_settings').select('id').lt('date',thisMonth);
+  if(!data||data.length===0){showToast('対象がありません');return;}
+  if(!confirm(`先月以前の予約枠設定 ${data.length}件 を削除しますか？`))return;
+  const{error}=await sbClient.from('slot_settings').delete().lt('date',thisMonth);
+  if(error){showToast('削除に失敗しました');return;}
+  document.getElementById('old-slot-preview').innerHTML='<span style="color:#06C755;">✅ 削除しました</span>';
+  document.getElementById('delete-old-slots-btn').style.display='none';
+  showToast(`${data.length}件の古い設定を削除しました`);
+}
+
 async function previewExpiredTickets(){
   if(!sbClient){showToast('Supabaseが未接続です');return;}
   const todayStr=new Date().toISOString().slice(0,10);
