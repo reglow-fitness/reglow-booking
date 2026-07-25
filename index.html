@@ -527,16 +527,19 @@ async function renderTimeSlots(ds) {
   let semiMaxPerSlot = {};
   let blockedSlots = [];
 
+  let taikenMaxPerSlot = {};
   if (slotSetting) {
     isClosed = slotSetting.is_closed;
     availableSlots = slotSetting.available_slots;
     semiMaxPerSlot = slotSetting.semi_max_per_slot || {};
     blockedSlots = slotSetting.blocked_slots || [];
+    taikenMaxPerSlot = slotSetting.taiken_max_per_slot || {};
   } else if (weeklySetting) {
     isClosed = weeklySetting.is_closed;
     availableSlots = weeklySetting.available_slots;
     semiMaxPerSlot = weeklySetting.semi_max_per_slot || {};
     blockedSlots = weeklySetting.blocked_slots || [];
+    taikenMaxPerSlot = weeklySetting.taiken_max_per_slot || {};
   }
 
   const d=new Date(ds);
@@ -553,6 +556,7 @@ async function renderTimeSlots(ds) {
 
   const isSemiMenu = selectedMenu?.ticket_cost > 0;
   const isPersonalMenu = selectedMenu?.ticket_cost === 0 && selectedMenu?.max_per_slot === 1;
+  // ★ taikenMaxPerSlot は slotSetting/weeklySetting から取得済み
 
   if (isClosed) {
     document.getElementById('time-slots').innerHTML = '<div style="color:#e74c3c;font-size:13px;">この日は休業日です</div>';
@@ -584,21 +588,29 @@ async function renderTimeSlots(ds) {
     const semiCount = slotBookings.filter(b=>b.menus?.ticket_cost>0 && b.menus?.max_per_slot!==1).length;
     const jiCount = slotBookings.filter(b=>b.menus?.ticket_cost===0&&b.menus?.max_per_slot>1).length;
 
+    const slotTaikenMax = taikenMaxPerSlot[slot] || 0; // ★ この枠の体験定員（0=体験枠なし）
     let isFull = false;
     const slotSemiMax = semiMaxPerSlot[slot] || 2;
     if(isSemiMenu){
-      if(personalCount > 0) isFull = true;
-      if(semiCount + jiCount >= slotSemiMax * 2) isFull = true;
+      // ★ 体験枠あり時間帯：セミパーソナルは体験の有無に関わらず予約可能
+      if(personalCount > 0 && slotTaikenMax === 0) isFull = true; // 体験枠なし時のみブロック
       if(semiCount >= slotSemiMax) isFull = true;
     } else if(isPersonalMenu){
-      if(semiCount > 0) isFull = true;
-      if(personalCount >= 1) isFull = true;
+      // ★ 体験枠あり時間帯：体験を1枠まで受付
+      if(slotTaikenMax > 0){
+        if(personalCount >= slotTaikenMax) isFull = true; // 体験定員に達したらブロック
+      } else {
+        if(semiCount > 0) isFull = true; // 体験枠なし時はセミがいたらブロック
+        if(personalCount >= 1) isFull = true;
+      }
     } else {
-      // ★ 自主トレ上限：セミパーソナル定員に応じて変動
-      // 定員2→自主トレ最大2、定員3→自主トレ最大1、定員4以上→自主トレ不可
-      const jiMax = slotSemiMax >= 4 ? 0 : slotSemiMax >= 3 ? 1 : 2;
-      if(jiMax === 0) isFull = true;
-      else if(jiCount >= jiMax) isFull = true;
+      // ★ 自主トレ：体験枠あり時間帯は常に不可、なし時はセミ定員に応じて変動
+      if(slotTaikenMax > 0 || personalCount > 0) { isFull = true; } // 体験枠あり or 体験予約ありなら不可
+      else {
+        const jiMax = slotSemiMax >= 4 ? 0 : slotSemiMax >= 3 ? 1 : 2;
+        if(jiMax === 0) isFull = true;
+        else if(jiCount >= jiMax) isFull = true;
+      }
     }
 
     const isSel = selectedTime===slot;
@@ -607,7 +619,7 @@ async function renderTimeSlots(ds) {
       const remain = slotSemiMax - semiCount;
       remainLabel = `<span style="font-size:10px;opacity:0.75;margin-left:3px;">残${remain}</span>`;
     }
-    // ★ 1対3枠バッジ
+    // ★ バッジ
     const trioBadge = slotSemiMax === 3
       ? `<span style="font-size:9px;background:#e8f1fc;color:#1a56a0;padding:1px 5px;border-radius:99px;font-weight:700;margin-left:4px;vertical-align:middle;">1対3</span>`
       : '';
@@ -763,12 +775,29 @@ async function submitBooking(){
     const jiCount2 = (slotBookings || []).filter(b => b.menus?.ticket_cost === 0 && b.menus?.max_per_slot !== 1).length;
     const isJishuMenu = selectedMenu.ticket_cost === 0 && !selectedMenu.name.includes('体験') && selectedMenu.max_per_slot !== 1;
 
-    if (isPersonalMenu && personalCount >= 1) {
-      btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
-      alert('申し訳ございません。この時間帯はすでに体験予約が入っております。\n別の時間をお選びください。');
-      return;
+    // ★ 体験枠設定を取得
+    const { data: taikenSlotCfg } = await sbClient.from('slot_settings').select('taiken_max_per_slot').eq('date', selectedDate).single();
+    const { data: taikenWeeklyCfg } = await sbClient.from('weekly_slot_settings').select('taiken_max_per_slot').eq('day_of_week', new Date(selectedDate).getDay()).single();
+    const slotTaikenMaxSubmit = taikenSlotCfg?.taiken_max_per_slot?.[selectedTime] || taikenWeeklyCfg?.taiken_max_per_slot?.[selectedTime] || 0;
+
+    if (isPersonalMenu) {
+      if(slotTaikenMaxSubmit > 0){
+        // 体験枠あり：体験定員チェック
+        if(personalCount >= slotTaikenMaxSubmit){
+          btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
+          alert('申し訳ございません。この時間帯の体験枠はすでに埋まっております。\n別の時間をお選びください。');
+          return;
+        }
+      } else {
+        // 体験枠なし：セミパーソナルがいたらブロック
+        if(semiCount > 0 || personalCount >= 1){
+          btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
+          alert('申し訳ございません。この時間帯はすでに体験予約が入っております。\n別の時間をお選びください。');
+          return;
+        }
+      }
     }
-    if (isSemiMenu && personalCount > 0) {
+    if (isSemiMenu && personalCount > 0 && slotTaikenMaxSubmit === 0) {
       btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
       alert('申し訳ございません。この時間帯は体験予約のため埋まっております。\n別の時間をお選びください。');
       return;
