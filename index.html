@@ -607,7 +607,7 @@ async function renderTimeSlots(ds) {
       // ★ 自主トレ：体験枠あり時間帯は常に不可、なし時はセミ定員に応じて変動
       if(slotTaikenMax > 0 || personalCount > 0) { isFull = true; } // 体験枠あり or 体験予約ありなら不可
       else {
-        const jiMax = slotSemiMax >= 4 ? 0 : slotSemiMax >= 3 ? 1 : 2;
+        const jiMax = slotSemiMax >= 3 ? 0 : 2; // ★ 定員3以上は自主トレ不可
         if(jiMax === 0) isFull = true;
         else if(jiCount >= jiMax) isFull = true;
       }
