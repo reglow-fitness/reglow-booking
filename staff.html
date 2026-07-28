@@ -14,20 +14,15 @@
   .header-sub { color: #aaa; font-size: 12px; margin-top: 2px; }
   .screen { display: none; padding: 14px; }
   .screen.active { display: block; }
-  .loading { text-align: center; color: #aaa; font-size: 13px; padding: 40px 0; }
+  .loading { text-align: center; color: #aaa; font-size: 13px; padding: 30px 0; }
   .card { background: white; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
   .card-title { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; }
   .form-label { font-size: 12px; color: #888; display: block; margin-bottom: 6px; }
-  .form-input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; margin-bottom: 12px; }
+  .form-input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; margin-bottom: 12px; background: white; }
   .btn { display: block; width: 100%; padding: 12px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; }
   .btn-primary { background: #222; color: white; }
-  .btn-secondary { background: #eee; color: #333; margin-top: 8px; }
-  .session-item { border: 1px solid #f0f0f0; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
-  .session-time { font-size: 13px; font-weight: 700; color: #222; }
-  .session-name { font-size: 12px; color: #888; margin-top: 2px; }
-  .session-done { font-size: 12px; color: #06C755; font-weight: 600; margin-top: 8px; }
-  .cat-buttons { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-top: 10px; }
-  .cat-btn { padding: 12px 4px; border-radius: 8px; border: 1.5px solid #ddd; background: white; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; }
+  .cat-buttons { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; }
+  .cat-btn { padding: 14px 4px; border-radius: 8px; border: 1.5px solid #ddd; background: white; font-size: 14px; font-weight: 700; cursor: pointer; text-align: center; }
   .cat-btn:active { transform: scale(0.96); }
   .cat-btn.c1 { border-color: #06C755; color: #06C755; }
   .cat-btn.c2 { border-color: #2f80ed; color: #2f80ed; }
@@ -36,10 +31,12 @@
   .section-label { font-size: 12px; color: #aaa; font-weight: 600; margin: 18px 0 8px; }
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #222; color: white; padding: 10px 18px; border-radius: 99px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
   .toast.show { opacity: 1; }
-  .tab-switch { display: flex; background: #eee; border-radius: 10px; padding: 3px; margin-bottom: 14px; }
-  .tab-switch-item { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; }
-  .tab-switch-item.active { background: white; color: #222; }
-  .history-row { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 0; border-bottom: 1px solid #f5f5f5; color: #666; }
+  .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+  .history-time { font-size: 14px; font-weight: 700; width: 60px; }
+  .history-cat { font-size: 13px; font-weight: 600; flex: 1; }
+  .history-cat.c1 { color: #06C755; } .history-cat.c2 { color: #2f80ed; } .history-cat.c3 { color: #9b51e0; } .history-cat.c0 { color: #999; }
+  .history-del { color: #e74c3c; font-size: 12px; font-weight: 600; padding: 6px 10px; cursor: pointer; }
+  .total-row { display: flex; justify-content: space-between; padding-top: 10px; margin-top: 6px; border-top: 2px solid #eee; font-size: 13px; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -49,7 +46,6 @@
   <div class="header-sub" id="header-date"></div>
 </div>
 
-<!-- ログイン中 -->
 <div class="screen active" id="screen-loading">
   <div class="loading">読み込み中...</div>
 </div>
@@ -69,32 +65,18 @@
 
 <!-- メイン画面 -->
 <div class="screen" id="screen-main">
-  <div class="tab-switch">
-    <div class="tab-switch-item active" id="tab-single" onclick="switchTab('single')">都度申請</div>
-    <div class="tab-switch-item" id="tab-batch" onclick="switchTab('batch')">まとめ申請</div>
-  </div>
-
-  <div id="pane-single">
-    <div class="section-label">本日の担当セッション</div>
-    <div id="single-session-list"><div class="loading">読み込み中...</div></div>
-  </div>
-
-  <div id="pane-batch" style="display:none;">
-    <div class="section-label">本日の担当セッション（まとめて選択）</div>
-    <div id="batch-session-list"><div class="loading">読み込み中...</div></div>
-    <button class="btn btn-primary" style="margin-top:6px;" onclick="submitBatch()">選択した内容をまとめて送信</button>
-  </div>
-
-  <div class="section-label">予約にない場合の手動申請</div>
   <div class="card">
+    <div class="card-title">申請を追加</div>
     <label class="form-label">対象日</label>
-    <input class="form-input" type="date" id="manual-date">
-    <label class="form-label">対応人数</label>
-    <div class="cat-buttons" id="manual-cat-buttons"></div>
+    <input class="form-input" type="date" id="entry-date">
+    <label class="form-label">時間</label>
+    <select class="form-input" id="entry-time"></select>
+    <label class="form-label">対応人数（タップで即申請）</label>
+    <div class="cat-buttons" id="entry-cat-buttons"></div>
   </div>
 
-  <div class="section-label">本日の申請履歴</div>
-  <div class="card" id="today-history"><div class="loading">読み込み中...</div></div>
+  <div class="section-label">申請履歴</div>
+  <div class="card" id="history-list"><div class="loading">読み込み中...</div></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -102,7 +84,6 @@
 <script>
 const SUPABASE_URL = 'https://plapbyvgthymszrzbsgl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
-// ★ 要設定: LINE Developers コンソールでこの staff.html 用に新しく発行したLIFF IDに差し替えてください
 const LIFF_ID = '2009580897-rRhB0wbR';
 
 const CATEGORY_LABELS = {1:'1人',2:'2人',3:'3人',0:'なし'};
@@ -111,20 +92,37 @@ const CATEGORY_CLASS = {1:'c1',2:'c2',3:'c3',0:'c0'};
 let sbClient = null;
 let lineProfile = null;
 let currentStaff = null;
-let todaySessions = [];
-let todayReports = [];
-let batchSelections = {};
+let historyEntries = [];
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
 function todayStr(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function showScreen(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+name).classList.add('active');}
+
+function buildTimeOptions(){
+  const sel = document.getElementById('entry-time');
+  let html = '';
+  for(let h=7; h<=22; h++){
+    for(const m of [0,30]){
+      const hh = String(h).padStart(2,'0'), mm = String(m).padStart(2,'0');
+      html += `<option value="${hh}:${mm}">${hh}:${mm}</option>`;
+    }
+  }
+  sel.innerHTML = html;
+  const now = new Date();
+  const roundedMin = now.getMinutes() < 30 ? '00' : '30';
+  const hh = String(now.getHours()).padStart(2,'0');
+  const target = `${hh}:${roundedMin}`;
+  if([...sel.options].some(o=>o.value===target)) sel.value = target;
+}
 
 async function init(){
   sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const dn=['日','月','火','水','木','金','土'];
   const d=new Date();
   document.getElementById('header-date').textContent=`${d.getMonth()+1}月${d.getDate()}日（${dn[d.getDay()]}）`;
-  document.getElementById('manual-date').value=todayStr();
+  document.getElementById('entry-date').value=todayStr();
+  buildTimeOptions();
+  renderCatButtons();
   try{
     await liff.init({ liffId: LIFF_ID });
     if(liff.isLoggedIn()){
@@ -142,7 +140,7 @@ async function init(){
     currentStaff = data;
     document.getElementById('header-staff-name').textContent = `${currentStaff.name} さん`;
     showScreen('main');
-    await loadMain();
+    await loadHistory();
   } else {
     await prepareLinkScreen();
     showScreen('link');
@@ -166,131 +164,63 @@ async function doLink(){
   currentStaff = {...staff, line_user_id: lineProfile.userId};
   document.getElementById('header-staff-name').textContent = `${currentStaff.name} さん`;
   showScreen('main');
-  await loadMain();
+  await loadHistory();
 }
 
-async function loadMain(){
-  await Promise.all([loadTodaySessions(), loadTodayReports()]);
-  renderSingleList();
-  renderBatchList();
-  renderHistory();
-  renderManualCatButtons();
+function renderCatButtons(){
+  const el = document.getElementById('entry-cat-buttons');
+  el.innerHTML = [1,2,3,0].map(c=>`<div class="cat-btn ${CATEGORY_CLASS[c]}" onclick="submitEntry(${c})">${CATEGORY_LABELS[c]}</div>`).join('');
 }
 
-async function loadTodaySessions(){
-  const start = todayStr()+'T00:00:00';
-  const end = todayStr()+'T23:59:59';
-  const {data} = await sbClient.from('bookings').select('*, customers(name)').eq('staff_id', currentStaff.id).eq('status','confirmed').gte('scheduled_at',start).lte('scheduled_at',end).order('scheduled_at');
-  const groups = {};
-  for(const b of (data||[])){
-    const key = b.scheduled_at;
-    if(!groups[key]) groups[key] = { time: key, bookingIds: [], names: [] };
-    groups[key].bookingIds.push(b.id);
-    groups[key].names.push(b.customers?.name || '—');
-  }
-  todaySessions = Object.values(groups).sort((a,b)=>a.time.localeCompare(b.time));
-}
-
-async function loadTodayReports(){
-  const {data} = await sbClient.from('session_reports').select('*').eq('staff_id', currentStaff.id).eq('report_date', todayStr()).order('created_at',{ascending:false});
-  todayReports = data || [];
-}
-
-function isReported(sessionTime){ return todayReports.some(r=>r.session_time===sessionTime); }
-
-function renderSingleList(){
-  const el = document.getElementById('single-session-list');
-  if(!todaySessions.length){el.innerHTML='<div class="loading">本日の担当予約はありません</div>';return;}
-  el.innerHTML = todaySessions.map(s=>{
-    const dt = new Date(s.time);
-    const timeStr = `${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
-    const done = isReported(s.time);
-    const idsAttr = JSON.stringify(s.bookingIds).replace(/"/g,'&quot;');
-    const buttons = [1,2,3,0].map(c=>`<div class="cat-btn ${CATEGORY_CLASS[c]}" onclick='reportSingle("${s.time}",${idsAttr},${c})'>${CATEGORY_LABELS[c]}</div>`).join('');
-    return `<div class="session-item">
-      <div class="session-time">${timeStr}〜（予約${s.bookingIds.length}件: ${s.names.join('・')}）</div>
-      ${done?'<div class="session-done">✓ 申請済み</div>':`<div class="cat-buttons">${buttons}</div>`}
-    </div>`;
-  }).join('');
-}
-
-async function reportSingle(sessionTime, bookingIds, category){
-  const {error} = await sbClient.from('session_reports').insert({staff_id: currentStaff.id, session_time: sessionTime, booking_ids: bookingIds, report_date: todayStr(), category, report_mode: 'single'});
+async function submitEntry(category){
+  const date = document.getElementById('entry-date').value;
+  const time = document.getElementById('entry-time').value;
+  if(!date||!time){toast('日付と時間を選択してください');return;}
+  const sessionTime = new Date(`${date}T${time}:00`).toISOString();
+  const {error} = await sbClient.from('session_reports').insert({staff_id: currentStaff.id, report_date: date, session_time: sessionTime, category, report_mode: 'single', booking_ids: []});
   if(error){toast('送信に失敗しました');return;}
-  toast('申請しました');
-  await loadTodayReports();
-  renderSingleList();
-  renderBatchList();
+  toast(`${time} ${CATEGORY_LABELS[category]}対応で申請しました`);
+  await loadHistory();
+}
+
+async function loadHistory(){
+  const {data} = await sbClient.from('session_reports').select('*').eq('staff_id', currentStaff.id).order('report_date',{ascending:false}).order('session_time',{ascending:false}).limit(30);
+  historyEntries = data || [];
   renderHistory();
-}
-
-function renderBatchList(){
-  const el = document.getElementById('batch-session-list');
-  const pending = todaySessions.filter(s=>!isReported(s.time));
-  if(!pending.length){el.innerHTML='<div class="loading">未申請の予約はありません</div>';return;}
-  el.innerHTML = pending.map(s=>{
-    const dt = new Date(s.time);
-    const timeStr = `${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
-    const sel = batchSelections[s.time];
-    const buttons = [1,2,3,0].map(c=>`<div class="cat-btn ${CATEGORY_CLASS[c]}" style="${sel===c?'background:#222;color:white;border-color:#222;':''}" onclick="setBatchSelection('${s.time}',${c})">${CATEGORY_LABELS[c]}</div>`).join('');
-    return `<div class="session-item">
-      <div class="session-time">${timeStr}〜（予約${s.bookingIds.length}件: ${s.names.join('・')}）</div>
-      <div class="cat-buttons">${buttons}</div>
-    </div>`;
-  }).join('');
-}
-
-function setBatchSelection(sessionTime, category){
-  batchSelections[sessionTime] = category;
-  renderBatchList();
-}
-
-async function submitBatch(){
-  const entries = Object.entries(batchSelections);
-  if(!entries.length){toast('選択がありません');return;}
-  const rows = entries.map(([sessionTime,category])=>{
-    const s = todaySessions.find(x=>x.time===sessionTime);
-    return {staff_id: currentStaff.id, session_time: sessionTime, booking_ids: s?s.bookingIds:[], report_date: todayStr(), category, report_mode: 'batch'};
-  });
-  const {error} = await sbClient.from('session_reports').insert(rows);
-  if(error){toast('送信に失敗しました');return;}
-  toast(`${rows.length}件まとめて申請しました`);
-  batchSelections = {};
-  await loadTodayReports();
-  renderSingleList();
-  renderBatchList();
-  renderHistory();
-}
-
-function renderManualCatButtons(){
-  const el = document.getElementById('manual-cat-buttons');
-  el.innerHTML = [1,2,3,0].map(c=>`<div class="cat-btn ${CATEGORY_CLASS[c]}" onclick="submitManual(${c})">${CATEGORY_LABELS[c]}</div>`).join('');
-}
-
-async function submitManual(category){
-  const date = document.getElementById('manual-date').value;
-  if(!date){toast('日付を選択してください');return;}
-  const {error} = await sbClient.from('session_reports').insert({staff_id: currentStaff.id, booking_id: null, report_date: date, category, report_mode: 'batch'});
-  if(error){toast('送信に失敗しました');return;}
-  toast('手動申請しました');
-  if(date===todayStr()){await loadTodayReports();renderHistory();}
 }
 
 function renderHistory(){
-  const el = document.getElementById('today-history');
-  if(!todayReports.length){el.innerHTML='<div class="loading">本日の申請はまだありません</div>';return;}
-  el.innerHTML = todayReports.map(r=>{
-    const t = new Date(r.created_at);
-    const timeStr = `${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}`;
-    return `<div class="history-row"><span>${timeStr}　${CATEGORY_LABELS[r.category]}対応</span><span>${r.session_time?'予約紐付け':'手動'}</span></div>`;
-  }).join('');
+  const el = document.getElementById('history-list');
+  if(!historyEntries.length){el.innerHTML='<div class="loading">まだ申請がありません</div>';return;}
+  let currentDate = null;
+  let html = '';
+  let dayCount = 0;
+  for(const r of historyEntries){
+    if(r.report_date !== currentDate){
+      if(currentDate !== null) html += `<div class="total-row"><span>件数</span><span>${dayCount}件</span></div>`;
+      currentDate = r.report_date;
+      dayCount = 0;
+      const [y,m,d] = r.report_date.split('-');
+      html += `<div class="section-label" style="margin-top:${html?'16px':'0'};">${m}月${d}日</div>`;
+    }
+    dayCount++;
+    const timeStr = r.session_time ? new Date(r.session_time).toTimeString().slice(0,5) : '—';
+    html += `<div class="history-row">
+      <div class="history-time">${timeStr}</div>
+      <div class="history-cat ${CATEGORY_CLASS[r.category]}">${CATEGORY_LABELS[r.category]}対応</div>
+      <div class="history-del" onclick="deleteEntry('${r.id}')">取消</div>
+    </div>`;
+  }
+  html += `<div class="total-row"><span>件数</span><span>${dayCount}件</span></div>`;
+  el.innerHTML = html;
 }
 
-function switchTab(name){
-  document.getElementById('tab-single').classList.toggle('active', name==='single');
-  document.getElementById('tab-batch').classList.toggle('active', name==='batch');
-  document.getElementById('pane-single').style.display = name==='single' ? 'block' : 'none';
-  document.getElementById('pane-batch').style.display = name==='batch' ? 'block' : 'none';
+async function deleteEntry(id){
+  if(!confirm('この申請を取り消しますか？')) return;
+  const {error} = await sbClient.from('session_reports').delete().eq('id', id);
+  if(error){toast('取り消しに失敗しました');return;}
+  toast('取り消しました');
+  await loadHistory();
 }
 
 init();
