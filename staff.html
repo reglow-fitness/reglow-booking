@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Re:GLOW FITNESS スタッフ申請</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #f0f0f0; color: #111; max-width: 480px; margin: 0 auto; min-height: 100vh; padding-bottom: 40px; }
+  .header { background: #222; padding: 16px; position: sticky; top: 0; z-index: 100; }
+  .header-title { color: white; font-size: 15px; font-weight: 600; }
+  .header-sub { color: #aaa; font-size: 12px; margin-top: 2px; }
+  .screen { display: none; padding: 14px; }
+  .screen.active { display: block; }
+  .loading { text-align: center; color: #aaa; font-size: 13px; padding: 40px 0; }
+  .card { background: white; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .card-title { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; }
+  .form-label { font-size: 12px; color: #888; display: block; margin-bottom: 6px; }
+  .form-input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; margin-bottom: 12px; }
+  .btn { display: block; width: 100%; padding: 12px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; }
+  .btn-primary { background: #222; color: white; }
+  .btn-secondary { background: #eee; color: #333; margin-top: 8px; }
+  .session-item { border: 1px solid #f0f0f0; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .session-time { font-size: 13px; font-weight: 700; color: #222; }
+  .session-name { font-size: 12px; color: #888; margin-top: 2px; }
+  .session-done { font-size: 12px; color: #06C755; font-weight: 600; margin-top: 8px; }
+  .cat-buttons { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-top: 10px; }
+  .cat-btn { padding: 12px 4px; border-radius: 8px; border: 1.5px solid #ddd; background: white; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; }
+  .cat-btn:active { transform: scale(0.96); }
+  .cat-btn.c1 { border-color: #06C755; color: #06C755; }
+  .cat-btn.c2 { border-color: #2f80ed; color: #2f80ed; }
+  .cat-btn.c3 { border-color: #9b51e0; color: #9b51e0; }
+  .cat-btn.c0 { border-color: #999; color: #999; }
+  .section-label { font-size: 12px; color: #aaa; font-weight: 600; margin: 18px 0 8px; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #222; color: white; padding: 10px 18px; border-radius: 99px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .tab-switch { display: flex; background: #eee; border-radius: 10px; padding: 3px; margin-bottom: 14px; }
+  .tab-switch-item { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; }
+  .tab-switch-item.active { background: white; color: #222; }
+  .history-row { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 0; border-bottom: 1px solid #f5f5f5; color: #666; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title" id="header-staff-name">Re:GLOW FITNESS スタッフ申請</div>
+  <div class="header-sub" id="header-date"></div>
+</div>
+
+<!-- ログイン中 -->
+<div class="screen active" id="screen-loading">
+  <div class="loading">読み込み中...</div>
+</div>
+
+<!-- 初回：本人紐付け -->
+<div class="screen" id="screen-link">
+  <div class="card">
+    <div class="card-title">初回登録</div>
+    <label class="form-label">お名前を選択してください</label>
+    <select class="form-input" id="link-staff-select"></select>
+    <label class="form-label">PINコード（4桁）</label>
+    <input class="form-input" id="link-pin-input" maxlength="4" inputmode="numeric" placeholder="1234">
+    <button class="btn btn-primary" onclick="doLink()">連携する</button>
+    <p style="font-size:11px;color:#aaa;margin-top:10px;">PINが分からない場合はオーナーに確認してください。一度連携すれば次回からこの画面は表示されません。</p>
+  </div>
+</div>
+
+<!-- メイン画面 -->
+<div class="screen" id="screen-main">
+  <div class="tab-switch">
+    <div class="tab-switch-item active" id="tab-single" onclick="switchTab('single')">都度申請</div>
+    <div class="tab-switch-item" id="tab-batch" onclick="switchTab('batch')">まとめ申請</div>
+  </div>
+
+  <div id="pane-single">
+    <div class="section-label">本日の担当セッション</div>
+    <div id="single-session-list"><div class="loading">読み込み中...</div></div>
+  </div>
+
+  <div id="pane-batch" style="display:none;">
+    <div class="section-label">本日の担当セッション（まとめて選択）</div>
+    <div id="batch-session-list"><div class="loading">読み込み中...</div></div>
+    <button class="btn btn-primary" style="margin-top:6px;" onclick="submitBatch()">選択した内容をまとめて送信</button>
+  </div>
+
+  <div class="section-label">予約にない場合の手動申請</div>
+  <div class="card">
+    <label class="form-label">対象日</label>
+    <input class="form-input" type="date" id="manual-date">
+    <label class="form-label">対応人数</label>
+    <div class="cat-buttons" id="manual-cat-buttons"></div>
+  </div>
+
+  <div class="section-label">本日の申請履歴</div>
+  <div class="card" id="today-history"><div class="loading">読み込み中...</div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://plapbyvgthymszrzbsgl.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';
+// ★ 要設定: LINE Developers コンソールでこの staff.html 用に新しく発行したLIFF IDに差し替えてください
+const LIFF_ID = '2009580897-rRhB0wbR';
+
+const CATEGORY_LABELS = {1:'1人',2:'2人',3:'3人',0:'なし'};
+const CATEGORY_CLASS = {1:'c1',2:'c2',3:'c3',0:'c0'};
+
+let sbClient = null;
+let lineProfile = null;
+let currentStaff = null;
+let todayBookings = [];
+let todayReports = [];
+let batchSelections = {};
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
+function todayStr(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function showScreen(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+name).classList.add('active');}
+
+async function init(){
+  sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const dn=['日','月','火','水','木','金','土'];
+  const d=new Date();
+  document.getElementById('header-date').textContent=`${d.getMonth()+1}月${d.getDate()}日（${dn[d.getDay()]}）`;
+  document.getElementById('manual-date').value=todayStr();
+  try{
+    await liff.init({ liffId: LIFF_ID });
+    if(liff.isLoggedIn()){
+      lineProfile = await liff.getProfile();
+    } else {
+      liff.login();
+      return;
+    }
+  }catch(e){
+    document.getElementById('screen-loading').innerHTML='<div class="loading">このページはLINEアプリ内でご利用ください。</div>';
+    return;
+  }
+  const {data} = await sbClient.from('staff').select('*').eq('line_user_id', lineProfile.userId).eq('is_active', true).maybeSingle();
+  if(data){
+    currentStaff = data;
+    document.getElementById('header-staff-name').textContent = `${currentStaff.name} さん`;
+    showScreen('main');
+    await loadMain();
+  } else {
+    await prepareLinkScreen();
+    showScreen('link');
+  }
+}
+
+async function prepareLinkScreen(){
+  const {data} = await sbClient.from('staff').select('*').eq('is_active', true).is('line_user_id', null).order('name');
+  const sel = document.getElementById('link-staff-select');
+  sel.innerHTML = (data||[]).map(s=>`<option value="${s.id}">${s.name}</option>`).join('') || '<option value="">対象スタッフがいません（オーナーに連絡してください）</option>';
+}
+
+async function doLink(){
+  const staffId = document.getElementById('link-staff-select').value;
+  const pin = document.getElementById('link-pin-input').value.trim();
+  if(!staffId){toast('スタッフを選択してください');return;}
+  const {data:staff} = await sbClient.from('staff').select('*').eq('id',staffId).single();
+  if(!staff || staff.pin_code !== pin){toast('PINが違います');return;}
+  const {error} = await sbClient.from('staff').update({line_user_id: lineProfile.userId}).eq('id', staffId);
+  if(error){toast('連携に失敗しました');return;}
+  currentStaff = {...staff, line_user_id: lineProfile.userId};
+  document.getElementById('header-staff-name').textContent = `${currentStaff.name} さん`;
+  showScreen('main');
+  await loadMain();
+}
+
+async function loadMain(){
+  await Promise.all([loadTodayBookings(), loadTodayReports()]);
+  renderSingleList();
+  renderBatchList();
+  renderHistory();
+  renderManualCatButtons();
+}
+
+async function loadTodayBookings(){
+  const start = todayStr()+'T00:00:00';
+  const end = todayStr()+'T23:59:59';
+  const {data} = await sbClient.from('bookings').select('*, customers(name)').eq('staff_id', currentStaff.id).eq('status','confirmed').gte('scheduled_at',start).lte('scheduled_at',end).order('scheduled_at');
+  todayBookings = data || [];
+}
+
+async function loadTodayReports(){
+  const {data} = await sbClient.from('session_reports').select('*').eq('staff_id', currentStaff.id).eq('report_date', todayStr()).order('created_at',{ascending:false});
+  todayReports = data || [];
+}
+
+function isReported(bookingId){ return todayReports.some(r=>r.booking_id===bookingId); }
+
+function renderSingleList(){
+  const el = document.getElementById('single-session-list');
+  if(!todayBookings.length){el.innerHTML='<div class="loading">本日の担当予約はありません</div>';return;}
+  el.innerHTML = todayBookings.map(b=>{
+    const dt = new Date(b.scheduled_at);
+    const timeStr = `${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    const done = isReported(b.id);
+    const buttons = [1,2,3,0].map(c=>`<div class="cat-btn ${CATEGORY_CLASS[c]}" onclick="reportSingle('${b.id}',${c})">${CATEGORY_LABELS[c]}</div>`).join('');
+    return `<div class="session-item">
+      <div class="session-time">${timeStr}〜</div>
+      <div class="session-name">${b.customers?.name||'—'} さん</div>
+      ${done?'<div class="session-done">✓ 申請済み</div>':`<div class="cat-buttons">${buttons}</div>`}
+    </div>`;
+  }).join('');
+}
+
+async function reportSingle(bookingId, category){
+  const {error} = await sbClient.from('session_reports').insert({staff_id: currentStaff.id, booking_id: bookingId, report_date: todayStr(), category, report_mode: 'single'});
+  if(error){toast('送信に失敗しました');return;}
+  toast('申請しました');
+  await loadTodayReports();
+  renderSingleList();
+  renderBatchList();
+  renderHistory();
+}
+
+function renderBatchList(){
+  const el = document.getElementById('batch-session-list');
+  const pending = todayBookings.filter(b=>!isReported(b.id));
+  if(!pending.length){el.innerHTML='<div class="loading">未申請の予約はありません</div>';return;}
+  el.innerHTML = pending.map(b=>{
+    const dt = new Date(b.scheduled_at);
+    const timeStr = `${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    const sel = batchSelections[b.id];
+    const buttons = [1,2,3,0].map(c=>`<div class="cat-btn ${CATEGORY_CLASS[c]}" style="${sel===c?'background:#222;color:white;border-color:#222;':''}" onclick="setBatchSelection('${b.id}',${c})">${CATEGORY_LABELS[c]}</div>`).join('');
+    return `<div class="session-item">
+      <div class="session-time">${timeStr}〜</div>
+      <div class="session-name">${b.customers?.name||'—'} さん</div>
+      <div class="cat-buttons">${buttons}</div>
+    </div>`;
+  }).join('');
+}
+
+function setBatchSelection(bookingId, category){
+  batchSelections[bookingId] = category;
+  renderBatchList();
+}
+
+async function submitBatch(){
+  const entries = Object.entries(batchSelections);
+  if(!entries.length){toast('選択がありません');return;}
+  const rows = entries.map(([bookingId,category])=>({staff_id: currentStaff.id, booking_id: bookingId, report_date: todayStr(), category, report_mode: 'batch'}));
+  const {error} = await sbClient.from('session_reports').insert(rows);
+  if(error){toast('送信に失敗しました');return;}
+  toast(`${rows.length}件まとめて申請しました`);
+  batchSelections = {};
+  await loadTodayReports();
+  renderSingleList();
+  renderBatchList();
+  renderHistory();
+}
+
+function renderManualCatButtons(){
+  const el = document.getElementById('manual-cat-buttons');
+  el.innerHTML = [1,2,3,0].map(c=>`<div class="cat-btn ${CATEGORY_CLASS[c]}" onclick="submitManual(${c})">${CATEGORY_LABELS[c]}</div>`).join('');
+}
+
+async function submitManual(category){
+  const date = document.getElementById('manual-date').value;
+  if(!date){toast('日付を選択してください');return;}
+  const {error} = await sbClient.from('session_reports').insert({staff_id: currentStaff.id, booking_id: null, report_date: date, category, report_mode: 'batch'});
+  if(error){toast('送信に失敗しました');return;}
+  toast('手動申請しました');
+  if(date===todayStr()){await loadTodayReports();renderHistory();}
+}
+
+function renderHistory(){
+  const el = document.getElementById('today-history');
+  if(!todayReports.length){el.innerHTML='<div class="loading">本日の申請はまだありません</div>';return;}
+  el.innerHTML = todayReports.map(r=>{
+    const t = new Date(r.created_at);
+    const timeStr = `${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}`;
+    return `<div class="history-row"><span>${timeStr}　${CATEGORY_LABELS[r.category]}対応</span><span>${r.booking_id?'予約紐付け':'手動'}</span></div>`;
+  }).join('');
+}
+
+function switchTab(name){
+  document.getElementById('tab-single').classList.toggle('active', name==='single');
+  document.getElementById('tab-batch').classList.toggle('active', name==='batch');
+  document.getElementById('pane-single').style.display = name==='single' ? 'block' : 'none';
+  document.getElementById('pane-batch').style.display = name==='batch' ? 'block' : 'none';
+}
+
+init();
+</script>
+</body>
+</html>
