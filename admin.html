@@ -152,6 +152,8 @@
       <a onclick="showPage('clients',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M2 14c0-3 2.686-4.5 6-4.5s6 1.5 6 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>顧客・チケット管理</a>
       <a onclick="showPage('bookings',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 1v4M11 1v4M1 7h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>予約一覧</a>
       <a onclick="showPage('slots',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 1v4M11 1v4M1 7h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 10h2M7 10h2M10 10h2M4 13h2M7 13h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>予約枠管理</a>
+      <a onclick="showPage('staffmanage',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="11" cy="6" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 14c0-2.5 1.8-4 4-4s4 1.5 4 4M9.5 14c0-2-1.2-3.3-2.5-3.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>スタッフ管理</a>
+      <a onclick="showPage('sessionreports',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 13V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10l-3-2-3 2-3-2-3 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 5.5h6M5 8h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>セッション集計</a>
       <a class="active" onclick="showPage('settings',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>設定</a>
     </nav>
   </div>
@@ -283,6 +285,43 @@
     </div>
 
     <!-- 設定 -->
+    <!-- スタッフ管理 -->
+    <div class="page" id="page-staffmanage">
+      <div class="page-title">スタッフ管理</div>
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:12px;">スタッフ追加</strong>
+        <div class="form-row"><label class="form-label">名前</label><input class="form-input" id="staff-new-name" placeholder="山田太郎"></div>
+        <div class="form-row"><label class="form-label">PINコード（4桁）</label><input class="form-input" id="staff-new-pin" placeholder="1234" maxlength="4"></div>
+        <button class="btn btn-primary" onclick="addStaff()">追加する</button>
+      </div>
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:12px;">スタッフ一覧</strong>
+        <div id="staff-list"><div class="loading">読み込み中...</div></div>
+      </div>
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:4px;">単価設定（全スタッフ共通デフォルト）</strong>
+        <p style="font-size:12px;color:#888;margin-bottom:14px;">各スタッフの一覧から個別単価も設定できます。個別設定があればそちらが優先されます。</p>
+        <div id="default-rates-editor"><div class="loading">読み込み中...</div></div>
+        <button class="btn btn-primary" style="margin-top:10px;" onclick="saveDefaultRates()">デフォルト単価を保存</button>
+      </div>
+    </div>
+
+    <!-- セッション集計 -->
+    <div class="page" id="page-sessionreports">
+      <div class="page-title">セッション集計</div>
+      <div class="card">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <label class="form-label" style="margin:0;">対象月</label>
+          <input class="form-input" type="month" id="report-month" style="width:auto;">
+          <button class="btn btn-primary" onclick="loadSessionReportSummary()">集計する</button>
+          <button class="btn" onclick="exportSessionReportCSV()">CSVダウンロード</button>
+        </div>
+      </div>
+      <div class="card">
+        <div id="session-report-summary"><div class="loading">対象月を選んで「集計する」を押してください</div></div>
+      </div>
+    </div>
+
     <div class="page active" id="page-settings">
       <div class="page-title">設定</div>
       <div class="card">
@@ -329,6 +368,12 @@
   </button>
   <button class="bottom-nav-item" id="bn-slots" onclick="showPage('slots',null);setBottomNav('bn-slots')">
     <svg viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 1v4M11 1v4M1 7h14M4 10h2M7 10h2M10 10h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>予約枠
+  </button>
+  <button class="bottom-nav-item" id="bn-staffmanage" onclick="showPage('staffmanage',null);setBottomNav('bn-staffmanage')">
+    <svg viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="11" cy="6" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 14c0-2.5 1.8-4 4-4s4 1.5 4 4M9.5 14c0-2-1.2-3.3-2.5-3.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>スタッフ
+  </button>
+  <button class="bottom-nav-item" id="bn-sessionreports" onclick="showPage('sessionreports',null);setBottomNav('bn-sessionreports')">
+    <svg viewBox="0 0 16 16" fill="none"><path d="M2 13V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10l-3-2-3 2-3-2-3 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>集計
   </button>
   <button class="bottom-nav-item" id="bn-settings" onclick="showPage('settings',null);setBottomNav('bn-settings')">
     <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>設定
@@ -383,6 +428,7 @@
     <div class="form-row"><label class="form-label">チケット</label><select class="form-input" id="booking-ticket-id"><option value="">顧客を先に選択</option></select></div>
     <div class="form-row"><label class="form-label">日時 *</label><input type="datetime-local" class="form-input" id="booking-datetime"></div>
     <div class="form-row"><label class="form-label">時間（分）</label><select class="form-input" id="booking-duration"><option value="60">60分</option><option value="90">90分</option><option value="120">120分</option></select></div>
+    <div class="form-row"><label class="form-label">担当スタッフ（内部管理用・会員には非表示）</label><select class="form-input" id="booking-staff-id"><option value="">未設定</option></select></div>
     <div class="modal-footer"><button class="btn" onclick="closeModal('modal-add-booking')">キャンセル</button><button class="btn btn-primary" onclick="addBooking()">予約を追加</button></div>
   </div>
 </div>
@@ -418,6 +464,8 @@ const DAY_NAMES=['日','月','火','水','木','金','土'];
 const TIME_SLOTS=DEFAULT_SLOTS;
 const MENU_COLORS={'A':{bg:'#e6f7ee',color:'#0a7a4a',border:'#b7e5cc'},'B':{bg:'#e8f1fc',color:'#1a56a0',border:'#b3d0f5'},'C':{bg:'#fff8e6',color:'#9a6800',border:'#f5dda0'}};
 let sbClient=null,currentClientTab='all',allClients=[],currentBookingView='calendar',currentWeekStart=null,slotWeekStart=null;
+let allStaff=[],allStaffRates=[];
+const SESSION_CATEGORY_LABELS={1:'1人対応',2:'2人対応',3:'3人対応',0:'なし'};
 
 // ★ クーポン判定
 function isCoupon(planType){return planType==='coupon';}
@@ -425,7 +473,7 @@ function isCoupon(planType){return planType==='coupon';}
 function setBottomNav(id){document.querySelectorAll('.bottom-nav-item').forEach(e=>e.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');}
 function initSupabase(){const url=document.getElementById('setting-url').value.trim()||'https://plapbyvgthymszrzbsgl.supabase.co';const key=document.getElementById('setting-key').value.trim()||'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';if(url&&key){sbClient=window.supabase.createClient(url,key);return true;}return false;}
 function saveSettings(){const url=document.getElementById('setting-url').value.trim();const key=document.getElementById('setting-key').value.trim();if(!url||!key){showToast('URLとキーを入力してください');return;}sbClient=window.supabase.createClient(url,key);document.getElementById('setting-status').textContent='✅ 接続しました！';showToast('接続しました！');showPage('dashboard',null);setBottomNav('bn-dashboard');loadAll();}
-function showPage(name,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');if(el&&el.tagName==='A')el.classList.add('active');if(name==='clients')renderClients();if(name==='bookings')loadBookings();if(name==='dashboard')loadDashboard();if(name==='slots')initSlotWeek();}
+function showPage(name,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');if(el&&el.tagName==='A')el.classList.add('active');if(name==='clients')renderClients();if(name==='bookings')loadBookings();if(name==='dashboard')loadDashboard();if(name==='slots')initSlotWeek();if(name==='staffmanage')loadStaffManage();if(name==='sessionreports')initSessionReportsPage();}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
@@ -641,7 +689,8 @@ function getWeekStart(date){const d=new Date(date);d.setDate(d.getDate()-d.getDa
 function changeWeek(dir){currentWeekStart.setDate(currentWeekStart.getDate()+dir*7);renderWeekCalendar();}
 async function renderWeekCalendar(){if(!sbClient)return;if(!currentWeekStart)currentWeekStart=getWeekStart(new Date());const weekEnd=new Date(currentWeekStart);weekEnd.setDate(weekEnd.getDate()+6);weekEnd.setHours(23,59,59,999);const mn=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];document.getElementById('week-label').textContent=`${currentWeekStart.getFullYear()}年${mn[currentWeekStart.getMonth()]}${currentWeekStart.getDate()}日 〜 ${mn[weekEnd.getMonth()]}${weekEnd.getDate()}日`;const{data:bookings}=await sbClient.from('bookings').select('*, customers(name), menus(name,ticket_cost)').gte('scheduled_at',toLocalDateStr(currentWeekStart)+'T00:00:00').lte('scheduled_at',toLocalDateStr(weekEnd)+'T23:59:59').eq('status','confirmed').order('scheduled_at',{ascending:true});const dn=['日','月','火','水','木','金','土'];const days=[];for(let i=0;i<7;i++){const d=new Date(currentWeekStart);d.setDate(d.getDate()+i);days.push(d);}const today=new Date();today.setHours(0,0,0,0);let html='<div style="display:grid;grid-template-columns:56px repeat(7,1fr);border-bottom:2px solid #e8e8e8;"><div></div>';for(const d of days){const isToday=d.getTime()===today.getTime();const col=d.getDay()===0?'#e06060':d.getDay()===6?'#6090e0':'#333';html+=`<div style="padding:8px 4px;text-align:center;${isToday?'background:#f0fdf4;':''}"><div style="font-size:11px;color:${col};font-weight:600;">${dn[d.getDay()]}</div><div style="font-size:16px;font-weight:${isToday?'700':'500'};color:${isToday?'#06C755':col};">${d.getDate()}</div></div>`;}html+='</div><div style="display:grid;grid-template-columns:56px repeat(7,1fr);">';for(const slot of TIME_SLOTS){const[h]=slot.split(':');html+=`<div style="padding:6px 4px;font-size:11px;color:#aaa;text-align:right;border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;display:flex;align-items:flex-start;justify-content:flex-end;">${slot}</div>`;for(const d of days){const isToday=d.getTime()===today.getTime();const dayB=(bookings||[]).filter(b=>{const bd=new Date(b.scheduled_at);return bd.getFullYear()===d.getFullYear()&&bd.getMonth()===d.getMonth()&&bd.getDate()===d.getDate()&&bd.getHours()===parseInt(h);});let cellHtml='';for(const b of dayB){const tc=b.menus?.ticket_cost;const mk=tc>0?'A':b.menus?.name?.includes('体験')?'B':'C';const mc=MENU_COLORS[mk]||MENU_COLORS['A'];cellHtml+=`<div style="background:${mc.bg};border:1px solid ${mc.border};border-radius:6px;padding:2px 6px;font-size:11px;color:${mc.color};margin-bottom:2px;cursor:pointer;" onclick="showBookingDetail('${b.id}','${(b.customers?.name||'').replace(/'/g,'`')}','${b.menus?.name||''}','${b.scheduled_at}')"><span style="font-weight:600;">${b.customers?.name?.slice(0,4)||'—'}</span></div>`;}html+=`<div style="border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;padding:2px;${isToday?'background:#fafffe;':''}">${cellHtml}</div>`;}}html+='</div>';document.getElementById('week-grid').innerHTML=html;}
 function showBookingDetail(id,name,menu,scheduledAt){const dt=new Date(scheduledAt);const dn=['日','月','火','水','木','金','土'];const dtStr=`${dt.getMonth()+1}月${dt.getDate()}日（${dn[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;if(confirm(`【${name}】\n${menu}\n${dtStr}\n\nこの予約をキャンセルしますか？`))cancelBooking(id);}
-async function loadBookingList(){if(!sbClient)return;const{data,error}=await sbClient.from('bookings').select('*, customers(name), menus(name)').order('scheduled_at',{ascending:false}).limit(50);if(error||!data||!data.length){document.getElementById('booking-list').innerHTML='<div class="loading">予約がありません</div>';return;}let html='<table><thead><tr><th>日時</th><th>顧客</th><th>メニュー</th><th>状態</th><th>操作</th></tr></thead><tbody>';for(const b of data){const dt=new Date(b.scheduled_at);const dtStr=`${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;const sm={confirmed:['確定','badge-green'],cancelled:['キャンセル','badge-red'],completed:['完了','badge-gray']};const[label,cls]=sm[b.status]||['—','badge-gray'];const[bg,fg]=getAvatarColor(b.customers?.name||'');html+=`<tr><td style="font-weight:600;">${dtStr}</td><td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};font-size:10px;">${getInitials(b.customers?.name||'')}</div>${b.customers?.name||'—'}</div></td><td>${b.menus?.name||'—'}</td><td><span class="badge ${cls}">${label}</span></td><td>${b.status==='confirmed'?`<button class="btn btn-sm btn-danger" onclick="cancelBooking('${b.id}')">キャンセル</button>`:'—'}</td></tr>`;}html+='</tbody></table>';document.getElementById('booking-list').innerHTML=html;}
+async function loadBookingList(){if(!sbClient)return;await ensureStaffLoaded();const{data,error}=await sbClient.from('bookings').select('*, customers(name), menus(name)').order('scheduled_at',{ascending:false}).limit(50);if(error||!data||!data.length){document.getElementById('booking-list').innerHTML='<div class="loading">予約がありません</div>';return;}let html='<table><thead><tr><th>日時</th><th>顧客</th><th>メニュー</th><th>担当</th><th>状態</th><th>操作</th></tr></thead><tbody>';for(const b of data){const dt=new Date(b.scheduled_at);const dtStr=`${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;const sm={confirmed:['確定','badge-green'],cancelled:['キャンセル','badge-red'],completed:['完了','badge-gray']};const[label,cls]=sm[b.status]||['—','badge-gray'];const[bg,fg]=getAvatarColor(b.customers?.name||'');const staffOptions=`<option value="">未設定</option>`+allStaff.map(s=>`<option value="${s.id}" ${b.staff_id===s.id?'selected':''}>${s.name}</option>`).join('');html+=`<tr><td style="font-weight:600;">${dtStr}</td><td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};font-size:10px;">${getInitials(b.customers?.name||'')}</div>${b.customers?.name||'—'}</div></td><td>${b.menus?.name||'—'}</td><td><select class="form-input" style="font-size:12px;padding:4px 6px;" onchange="updateBookingStaff('${b.id}',this.value)">${staffOptions}</select></td><td><span class="badge ${cls}">${label}</span></td><td>${b.status==='confirmed'?`<button class="btn btn-sm btn-danger" onclick="cancelBooking('${b.id}')">キャンセル</button>`:'—'}</td></tr>`;}html+='</tbody></table>';document.getElementById('booking-list').innerHTML=html;}
+async function updateBookingStaff(bookingId,staffId){const{error}=await sbClient.from('bookings').update({staff_id:staffId||null}).eq('id',bookingId);if(error){showToast('担当者の更新に失敗しました');return;}showToast('担当者を更新しました');}
 async function loadBookings(){if(!sbClient)return;currentWeekStart=getWeekStart(new Date());setBookingView('calendar');}
 
 async function cancelBooking(id){
@@ -665,9 +714,10 @@ async function cancelBookingFromPanel(bookingId,customerId){
   const pcEl=document.getElementById('ticket-panel-'+customerId);if(pcEl&&pcEl.style.display!=='none')document.getElementById('ticket-panel-inner-'+customerId).innerHTML=await buildPanelHTML(customerId);
 }
 
-async function openAddBookingModal(){const sel=document.getElementById('booking-customer-id');sel.innerHTML='<option value="">選択してください</option>';for(const c of allClients)sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`;const now=new Date();now.setMinutes(0,0,0);document.getElementById('booking-datetime').value=now.toISOString().slice(0,16);openModal('modal-add-booking');}
+async function ensureStaffLoaded(){if(!sbClient)return;if(!allStaff.length){const{data}=await sbClient.from('staff').select('*').order('name');allStaff=data||[];}}
+async function openAddBookingModal(){const sel=document.getElementById('booking-customer-id');sel.innerHTML='<option value="">選択してください</option>';for(const c of allClients)sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`;const now=new Date();now.setMinutes(0,0,0);document.getElementById('booking-datetime').value=now.toISOString().slice(0,16);await ensureStaffLoaded();const staffSel=document.getElementById('booking-staff-id');staffSel.innerHTML='<option value="">未設定</option>';for(const s of allStaff.filter(s=>s.is_active))staffSel.innerHTML+=`<option value="${s.id}">${s.name}</option>`;openModal('modal-add-booking');}
 async function loadCustomerTickets(customerId){const sel=document.getElementById('booking-ticket-id');sel.innerHTML='<option value="">チケットなし</option>';if(!customerId||!sbClient)return;const{data}=await sbClient.from('tickets').select('*').eq('customer_id',customerId);if(data)for(const t of data){const label=PLAN_NAMES[t.plan_type]||t.plan_type;const rem=t.plan_type!=='unlimited'?` (残${t.remaining_count}回)`:'';sel.innerHTML+=`<option value="${t.id}">${label}${rem}</option>`;}}
-async function addBooking(){if(!sbClient){showToast('Supabaseが未設定です');return;}const customerId=document.getElementById('booking-customer-id').value;const ticketId=document.getElementById('booking-ticket-id').value;const dt=document.getElementById('booking-datetime').value;const duration=parseInt(document.getElementById('booking-duration').value);if(!customerId||!dt){showToast('顧客と日時を選択してください');return;}const{error}=await sbClient.from('bookings').insert({customer_id:customerId,ticket_id:ticketId||null,scheduled_at:new Date(dt).toISOString(),duration_minutes:duration,status:'confirmed'});if(error){showToast('予約の追加に失敗しました');return;}if(ticketId){const ticket=allClients.flatMap(c=>c.tickets||[]).find(t=>t.id===ticketId);if(ticket&&ticket.plan_type!=='unlimited'&&ticket.remaining_count>0)await sbClient.from('tickets').update({remaining_count:ticket.remaining_count-1}).eq('id',ticketId);}closeModal('modal-add-booking');showToast('予約を追加しました');await loadAll();}
+async function addBooking(){if(!sbClient){showToast('Supabaseが未設定です');return;}const customerId=document.getElementById('booking-customer-id').value;const ticketId=document.getElementById('booking-ticket-id').value;const dt=document.getElementById('booking-datetime').value;const duration=parseInt(document.getElementById('booking-duration').value);const staffId=document.getElementById('booking-staff-id').value;if(!customerId||!dt){showToast('顧客と日時を選択してください');return;}const{error}=await sbClient.from('bookings').insert({customer_id:customerId,ticket_id:ticketId||null,scheduled_at:new Date(dt).toISOString(),duration_minutes:duration,status:'confirmed',staff_id:staffId||null});if(error){showToast('予約の追加に失敗しました');return;}if(ticketId){const ticket=allClients.flatMap(c=>c.tickets||[]).find(t=>t.id===ticketId);if(ticket&&ticket.plan_type!=='unlimited'&&ticket.remaining_count>0)await sbClient.from('tickets').update({remaining_count:ticket.remaining_count-1}).eq('id',ticketId);}closeModal('modal-add-booking');showToast('予約を追加しました');await loadAll();}
 
 async function toggleTicketPanel(customerId,tr){
   const panelRow=document.getElementById('ticket-panel-'+customerId);
@@ -806,6 +856,188 @@ async function deleteExpiredTickets(){
 }
 
 async function toggleBlockClient(id,name,isBlocked){const msg=isBlocked?`${name} さんのブロックを解除しますか？`:`${name} さんをブロックしますか？\n全メニューの予約ができなくなります。`;if(!confirm(msg))return;const{error}=await sbClient.from('customers').update({is_blocked:!isBlocked}).eq('id',id);if(error){showToast('更新に失敗しました');return;}showToast(isBlocked?'ブロックを解除しました':`${name} さんをブロックしました`);await loadCustomers();}
+
+/* ===================== スタッフ管理 ===================== */
+async function loadStaffManage(){
+  if(!sbClient)return;
+  const{data:staffData,error:e1}=await sbClient.from('staff').select('*').order('created_at',{ascending:true});
+  const{data:rateData,error:e2}=await sbClient.from('staff_rates').select('*');
+  if(e1||e2){document.getElementById('staff-list').innerHTML='<div class="loading">読み込みに失敗しました（テーブルが未作成の可能性があります）</div>';return;}
+  allStaff=staffData||[];
+  allStaffRates=rateData||[];
+  renderStaffList();
+  renderDefaultRatesEditor();
+}
+function getRate(staffId,category){
+  const own=allStaffRates.find(r=>r.staff_id===staffId&&r.category===category);
+  if(own)return own.rate;
+  const def=allStaffRates.find(r=>r.staff_id===null&&r.category===category);
+  return def?def.rate:0;
+}
+function renderStaffList(){
+  const el=document.getElementById('staff-list');
+  if(!allStaff.length){el.innerHTML='<div class="loading">スタッフが登録されていません</div>';return;}
+  let html='';
+  for(const s of allStaff){
+    const hasOwnRate=allStaffRates.some(r=>r.staff_id===s.id);
+    html+=`<div style="border:1px solid #f0f0f0;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div>
+          <strong style="font-size:14px;">${s.name}</strong>
+          ${s.is_active?'<span class="badge badge-green" style="margin-left:6px;">稼働中</span>':'<span class="badge" style="margin-left:6px;background:#f0f0f0;color:#888;">停止中</span>'}
+          ${hasOwnRate?'<span class="badge badge-amber" style="margin-left:6px;">個別単価あり</span>':''}
+          <div style="font-size:12px;color:#888;margin-top:3px;">PIN: ${s.pin_code||'未設定'}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-sm" onclick="toggleStaffRateEditor('${s.id}')">単価設定</button>
+          <button class="btn btn-sm" onclick="editStaffPin('${s.id}','${s.name.replace(/'/g,"\\'")}')">PIN変更</button>
+          <button class="btn btn-sm" onclick="toggleStaffActive('${s.id}',${s.is_active})">${s.is_active?'停止':'再開'}</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteStaff('${s.id}','${s.name.replace(/'/g,"\\'")}')">削除</button>
+        </div>
+      </div>
+      <div id="staff-rate-editor-${s.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #f5f5f5;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+          ${[1,2,3,0].map(c=>`<div><label style="font-size:11px;color:#888;display:block;margin-bottom:4px;">${SESSION_CATEGORY_LABELS[c]}</label><input type="number" class="form-input staff-rate-input" data-staff="${s.id}" data-cat="${c}" value="${getRate(s.id,c)}"></div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="btn btn-primary btn-sm" onclick="saveStaffRate('${s.id}')">この単価を保存</button>
+          ${hasOwnRate?`<button class="btn btn-sm" onclick="clearStaffRate('${s.id}')">個別設定を削除（共通に戻す）</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }
+  el.innerHTML=html;
+}
+function toggleStaffRateEditor(staffId){
+  const box=document.getElementById('staff-rate-editor-'+staffId);
+  box.style.display=box.style.display==='none'?'block':'none';
+}
+async function addStaff(){
+  const name=document.getElementById('staff-new-name').value.trim();
+  const pin=document.getElementById('staff-new-pin').value.trim();
+  if(!name){showToast('名前を入力してください');return;}
+  if(pin&&!/^\d{4}$/.test(pin)){showToast('PINは4桁の数字で入力してください');return;}
+  const{error}=await sbClient.from('staff').insert({name,pin_code:pin||null,is_active:true});
+  if(error){showToast('追加に失敗しました');return;}
+  document.getElementById('staff-new-name').value='';
+  document.getElementById('staff-new-pin').value='';
+  showToast(`${name} さんを追加しました`);
+  await loadStaffManage();
+}
+async function editStaffPin(id,name){
+  const pin=prompt(`${name} さんの新しいPIN（4桁）を入力してください`);
+  if(pin===null)return;
+  if(!/^\d{4}$/.test(pin)){showToast('PINは4桁の数字で入力してください');return;}
+  const{error}=await sbClient.from('staff').update({pin_code:pin}).eq('id',id);
+  if(error){showToast('更新に失敗しました');return;}
+  showToast('PINを更新しました');
+  await loadStaffManage();
+}
+async function toggleStaffActive(id,current){
+  const{error}=await sbClient.from('staff').update({is_active:!current}).eq('id',id);
+  if(error){showToast('更新に失敗しました');return;}
+  showToast(current?'スタッフを停止しました':'スタッフを再開しました');
+  await loadStaffManage();
+}
+async function deleteStaff(id,name){
+  if(!confirm(`${name} さんを削除しますか？\n過去の申請データは残りますが、予約の担当者表示は「—」になります。`))return;
+  const{error}=await sbClient.from('staff').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました');return;}
+  showToast(`${name} さんを削除しました`);
+  await loadStaffManage();
+}
+async function saveStaffRate(staffId){
+  const inputs=[...document.querySelectorAll(`.staff-rate-input[data-staff="${staffId}"]`)];
+  for(const inp of inputs){
+    const category=parseInt(inp.dataset.cat);
+    const rate=parseInt(inp.value)||0;
+    await sbClient.from('staff_rates').upsert({staff_id:staffId,category,rate},{onConflict:'staff_id,category'});
+  }
+  showToast('単価を保存しました');
+  await loadStaffManage();
+}
+async function clearStaffRate(staffId){
+  if(!confirm('個別単価を削除して共通単価に戻しますか？'))return;
+  await sbClient.from('staff_rates').delete().eq('staff_id',staffId);
+  showToast('共通単価に戻しました');
+  await loadStaffManage();
+}
+function renderDefaultRatesEditor(){
+  const el=document.getElementById('default-rates-editor');
+  el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+    ${[1,2,3,0].map(c=>`<div><label style="font-size:11px;color:#888;display:block;margin-bottom:4px;">${SESSION_CATEGORY_LABELS[c]}</label><input type="number" class="form-input default-rate-input" data-cat="${c}" value="${getRate(null,c)}"></div>`).join('')}
+  </div>`;
+}
+async function saveDefaultRates(){
+  const inputs=[...document.querySelectorAll('.default-rate-input')];
+  for(const inp of inputs){
+    const category=parseInt(inp.dataset.cat);
+    const rate=parseInt(inp.value)||0;
+    await sbClient.from('staff_rates').upsert({staff_id:null,category,rate},{onConflict:'staff_id,category'});
+  }
+  showToast('デフォルト単価を保存しました');
+  await loadStaffManage();
+}
+
+/* ===================== セッション集計 ===================== */
+function initSessionReportsPage(){
+  const monthInput=document.getElementById('report-month');
+  if(!monthInput.value){
+    const now=new Date();
+    monthInput.value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  }
+  loadSessionReportSummary();
+}
+let lastSessionReportSummary=null;
+async function loadSessionReportSummary(){
+  if(!sbClient)return;
+  const month=document.getElementById('report-month').value;
+  if(!month){showToast('対象月を選択してください');return;}
+  const el=document.getElementById('session-report-summary');
+  el.innerHTML='<div class="loading">集計中...</div>';
+  const [y,m]=month.split('-').map(Number);
+  const startDate=`${month}-01`;
+  const endDate=new Date(y,m,0).toISOString().slice(0,10);
+  const{data:staffData}=await sbClient.from('staff').select('*');
+  const{data:rateData}=await sbClient.from('staff_rates').select('*');
+  const{data:reports,error}=await sbClient.from('session_reports').select('*').gte('report_date',startDate).lte('report_date',endDate);
+  if(error){el.innerHTML='<div class="loading">集計に失敗しました（テーブルが未作成の可能性があります）</div>';return;}
+  allStaff=staffData||[];
+  allStaffRates=rateData||[];
+  const byStaff={};
+  for(const s of allStaff)byStaff[s.id]={name:s.name,counts:{1:0,2:0,3:0,0:0},amount:0};
+  for(const r of(reports||[])){
+    if(!byStaff[r.staff_id])byStaff[r.staff_id]={name:'（削除済スタッフ）',counts:{1:0,2:0,3:0,0:0},amount:0};
+    byStaff[r.staff_id].counts[r.category]=(byStaff[r.staff_id].counts[r.category]||0)+1;
+    byStaff[r.staff_id].amount+=getRate(r.staff_id,r.category);
+  }
+  lastSessionReportSummary={month,byStaff};
+  const rows=Object.values(byStaff);
+  if(!rows.length){el.innerHTML='<div class="loading">対象月の申請データがありません</div>';return;}
+  let total=0;
+  let html='<table><thead><tr><th>スタッフ</th><th>1人対応</th><th>2人対応</th><th>3人対応</th><th>なし</th><th>合計件数</th><th>報酬合計</th></tr></thead><tbody>';
+  for(const row of rows){
+    const cnt=row.counts[1]+row.counts[2]+row.counts[3]+row.counts[0];
+    total+=row.amount;
+    html+=`<tr><td style="font-weight:600;">${row.name}</td><td>${row.counts[1]}</td><td>${row.counts[2]}</td><td>${row.counts[3]}</td><td>${row.counts[0]}</td><td>${cnt}</td><td>¥${row.amount.toLocaleString()}</td></tr>`;
+  }
+  html+=`</tbody></table><div style="text-align:right;margin-top:12px;font-size:15px;font-weight:700;">合計　¥${total.toLocaleString()}</div>`;
+  el.innerHTML=html;
+}
+function exportSessionReportCSV(){
+  if(!lastSessionReportSummary){showToast('先に集計してください');return;}
+  const{month,byStaff}=lastSessionReportSummary;
+  let csv='スタッフ,1人対応,2人対応,3人対応,なし,合計件数,報酬合計\n';
+  for(const row of Object.values(byStaff)){
+    const cnt=row.counts[1]+row.counts[2]+row.counts[3]+row.counts[0];
+    csv+=`${row.name},${row.counts[1]},${row.counts[2]},${row.counts[3]},${row.counts[0]},${cnt},${row.amount}\n`;
+  }
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`session_report_${month}.csv`;a.click();
+  URL.revokeObjectURL(url);
+}
 
 window.addEventListener('DOMContentLoaded',()=>{
   const FIXED_URL='https://plapbyvgthymszrzbsgl.supabase.co';
