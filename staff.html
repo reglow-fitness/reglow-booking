@@ -111,7 +111,7 @@ const CATEGORY_CLASS = {1:'c1',2:'c2',3:'c3',0:'c0'};
 let sbClient = null;
 let lineProfile = null;
 let currentStaff = null;
-let todayBookings = [];
+let todaySessions = [];
 let todayReports = [];
 let batchSelections = {};
 
@@ -170,18 +170,25 @@ async function doLink(){
 }
 
 async function loadMain(){
-  await Promise.all([loadTodayBookings(), loadTodayReports()]);
+  await Promise.all([loadTodaySessions(), loadTodayReports()]);
   renderSingleList();
   renderBatchList();
   renderHistory();
   renderManualCatButtons();
 }
 
-async function loadTodayBookings(){
+async function loadTodaySessions(){
   const start = todayStr()+'T00:00:00';
   const end = todayStr()+'T23:59:59';
   const {data} = await sbClient.from('bookings').select('*, customers(name)').eq('staff_id', currentStaff.id).eq('status','confirmed').gte('scheduled_at',start).lte('scheduled_at',end).order('scheduled_at');
-  todayBookings = data || [];
+  const groups = {};
+  for(const b of (data||[])){
+    const key = b.scheduled_at;
+    if(!groups[key]) groups[key] = { time: key, bookingIds: [], names: [] };
+    groups[key].bookingIds.push(b.id);
+    groups[key].names.push(b.customers?.name || '—');
+  }
+  todaySessions = Object.values(groups).sort((a,b)=>a.time.localeCompare(b.time));
 }
 
 async function loadTodayReports(){
@@ -189,26 +196,26 @@ async function loadTodayReports(){
   todayReports = data || [];
 }
 
-function isReported(bookingId){ return todayReports.some(r=>r.booking_id===bookingId); }
+function isReported(sessionTime){ return todayReports.some(r=>r.session_time===sessionTime); }
 
 function renderSingleList(){
   const el = document.getElementById('single-session-list');
-  if(!todayBookings.length){el.innerHTML='<div class="loading">本日の担当予約はありません</div>';return;}
-  el.innerHTML = todayBookings.map(b=>{
-    const dt = new Date(b.scheduled_at);
+  if(!todaySessions.length){el.innerHTML='<div class="loading">本日の担当予約はありません</div>';return;}
+  el.innerHTML = todaySessions.map(s=>{
+    const dt = new Date(s.time);
     const timeStr = `${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
-    const done = isReported(b.id);
-    const buttons = [1,2,3,0].map(c=>`<div class="cat-btn ${CATEGORY_CLASS[c]}" onclick="reportSingle('${b.id}',${c})">${CATEGORY_LABELS[c]}</div>`).join('');
+    const done = isReported(s.time);
+    const idsAttr = JSON.stringify(s.bookingIds).replace(/"/g,'&quot;');
+    const buttons = [1,2,3,0].map(c=>`<div class="cat-btn ${CATEGORY_CLASS[c]}" onclick='reportSingle("${s.time}",${idsAttr},${c})'>${CATEGORY_LABELS[c]}</div>`).join('');
     return `<div class="session-item">
-      <div class="session-time">${timeStr}〜</div>
-      <div class="session-name">${b.customers?.name||'—'} さん</div>
+      <div class="session-time">${timeStr}〜（予約${s.bookingIds.length}件: ${s.names.join('・')}）</div>
       ${done?'<div class="session-done">✓ 申請済み</div>':`<div class="cat-buttons">${buttons}</div>`}
     </div>`;
   }).join('');
 }
 
-async function reportSingle(bookingId, category){
-  const {error} = await sbClient.from('session_reports').insert({staff_id: currentStaff.id, booking_id: bookingId, report_date: todayStr(), category, report_mode: 'single'});
+async function reportSingle(sessionTime, bookingIds, category){
+  const {error} = await sbClient.from('session_reports').insert({staff_id: currentStaff.id, session_time: sessionTime, booking_ids: bookingIds, report_date: todayStr(), category, report_mode: 'single'});
   if(error){toast('送信に失敗しました');return;}
   toast('申請しました');
   await loadTodayReports();
@@ -219,30 +226,32 @@ async function reportSingle(bookingId, category){
 
 function renderBatchList(){
   const el = document.getElementById('batch-session-list');
-  const pending = todayBookings.filter(b=>!isReported(b.id));
+  const pending = todaySessions.filter(s=>!isReported(s.time));
   if(!pending.length){el.innerHTML='<div class="loading">未申請の予約はありません</div>';return;}
-  el.innerHTML = pending.map(b=>{
-    const dt = new Date(b.scheduled_at);
+  el.innerHTML = pending.map(s=>{
+    const dt = new Date(s.time);
     const timeStr = `${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
-    const sel = batchSelections[b.id];
-    const buttons = [1,2,3,0].map(c=>`<div class="cat-btn ${CATEGORY_CLASS[c]}" style="${sel===c?'background:#222;color:white;border-color:#222;':''}" onclick="setBatchSelection('${b.id}',${c})">${CATEGORY_LABELS[c]}</div>`).join('');
+    const sel = batchSelections[s.time];
+    const buttons = [1,2,3,0].map(c=>`<div class="cat-btn ${CATEGORY_CLASS[c]}" style="${sel===c?'background:#222;color:white;border-color:#222;':''}" onclick="setBatchSelection('${s.time}',${c})">${CATEGORY_LABELS[c]}</div>`).join('');
     return `<div class="session-item">
-      <div class="session-time">${timeStr}〜</div>
-      <div class="session-name">${b.customers?.name||'—'} さん</div>
+      <div class="session-time">${timeStr}〜（予約${s.bookingIds.length}件: ${s.names.join('・')}）</div>
       <div class="cat-buttons">${buttons}</div>
     </div>`;
   }).join('');
 }
 
-function setBatchSelection(bookingId, category){
-  batchSelections[bookingId] = category;
+function setBatchSelection(sessionTime, category){
+  batchSelections[sessionTime] = category;
   renderBatchList();
 }
 
 async function submitBatch(){
   const entries = Object.entries(batchSelections);
   if(!entries.length){toast('選択がありません');return;}
-  const rows = entries.map(([bookingId,category])=>({staff_id: currentStaff.id, booking_id: bookingId, report_date: todayStr(), category, report_mode: 'batch'}));
+  const rows = entries.map(([sessionTime,category])=>{
+    const s = todaySessions.find(x=>x.time===sessionTime);
+    return {staff_id: currentStaff.id, session_time: sessionTime, booking_ids: s?s.bookingIds:[], report_date: todayStr(), category, report_mode: 'batch'};
+  });
   const {error} = await sbClient.from('session_reports').insert(rows);
   if(error){toast('送信に失敗しました');return;}
   toast(`${rows.length}件まとめて申請しました`);
@@ -273,7 +282,7 @@ function renderHistory(){
   el.innerHTML = todayReports.map(r=>{
     const t = new Date(r.created_at);
     const timeStr = `${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}`;
-    return `<div class="history-row"><span>${timeStr}　${CATEGORY_LABELS[r.category]}対応</span><span>${r.booking_id?'予約紐付け':'手動'}</span></div>`;
+    return `<div class="history-row"><span>${timeStr}　${CATEGORY_LABELS[r.category]}対応</span><span>${r.session_time?'予約紐付け':'手動'}</span></div>`;
   }).join('');
 }
 
