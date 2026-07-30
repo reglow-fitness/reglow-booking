@@ -37,6 +37,10 @@
   .history-cat.c1 { color: #06C755; } .history-cat.c2 { color: #2f80ed; } .history-cat.c3 { color: #9b51e0; } .history-cat.c0 { color: #999; }
   .history-del { color: #e74c3c; font-size: 12px; font-weight: 600; padding: 6px 10px; cursor: pointer; }
   .total-row { display: flex; justify-content: space-between; padding-top: 10px; margin-top: 6px; border-top: 2px solid #eee; font-size: 13px; font-weight: 700; }
+  .day-card { background: white; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; }
+  .day-card-title { font-size: 13px; font-weight: 700; color: #222; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: baseline; }
+  .day-card-title .day-count { font-size: 11px; font-weight: 600; color: #aaa; }
+  .day-card .history-row:last-child { border-bottom: none; }
 </style>
 </head>
 <body>
@@ -76,7 +80,7 @@
   </div>
 
   <div class="section-label">申請履歴</div>
-  <div class="card" id="history-list"><div class="loading">読み込み中...</div></div>
+  <div id="history-list"><div class="loading">読み込み中...</div></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -102,16 +106,13 @@ function buildTimeOptions(){
   const sel = document.getElementById('entry-time');
   let html = '';
   for(let h=7; h<=22; h++){
-    for(const m of [0,30]){
-      const hh = String(h).padStart(2,'0'), mm = String(m).padStart(2,'0');
-      html += `<option value="${hh}:${mm}">${hh}:${mm}</option>`;
-    }
+    const hh = String(h).padStart(2,'0');
+    html += `<option value="${hh}:00">${hh}時</option>`;
   }
   sel.innerHTML = html;
   const now = new Date();
-  const roundedMin = now.getMinutes() < 30 ? '00' : '30';
   const hh = String(now.getHours()).padStart(2,'0');
-  const target = `${hh}:${roundedMin}`;
+  const target = `${hh}:00`;
   if([...sel.options].some(o=>o.value===target)) sel.value = target;
 }
 
@@ -192,26 +193,29 @@ async function loadHistory(){
 function renderHistory(){
   const el = document.getElementById('history-list');
   if(!historyEntries.length){el.innerHTML='<div class="loading">まだ申請がありません</div>';return;}
-  let currentDate = null;
-  let html = '';
-  let dayCount = 0;
+  const byDate = {};
+  const order = [];
   for(const r of historyEntries){
-    if(r.report_date !== currentDate){
-      if(currentDate !== null) html += `<div class="total-row"><span>件数</span><span>${dayCount}件</span></div>`;
-      currentDate = r.report_date;
-      dayCount = 0;
-      const [y,m,d] = r.report_date.split('-');
-      html += `<div class="section-label" style="margin-top:${html?'16px':'0'};">${m}月${d}日</div>`;
-    }
-    dayCount++;
-    const timeStr = r.session_time ? new Date(r.session_time).toTimeString().slice(0,5) : '—';
-    html += `<div class="history-row">
-      <div class="history-time">${timeStr}</div>
-      <div class="history-cat ${CATEGORY_CLASS[r.category]}">${CATEGORY_LABELS[r.category]}対応</div>
-      <div class="history-del" onclick="deleteEntry('${r.id}')">取消</div>
+    if(!byDate[r.report_date]){byDate[r.report_date]=[];order.push(r.report_date);}
+    byDate[r.report_date].push(r);
+  }
+  let html = '';
+  for(const date of order){
+    const rows = byDate[date];
+    const [y,m,d] = date.split('-');
+    const isToday = date === todayStr();
+    html += `<div class="day-card">
+      <div class="day-card-title"><span>${m}月${d}日${isToday?'（本日）':''}</span><span class="day-count">${rows.length}件</span></div>
+      ${rows.map(r=>{
+        const timeStr = r.session_time ? new Date(r.session_time).toTimeString().slice(0,5) : '—';
+        return `<div class="history-row">
+          <div class="history-time">${timeStr}</div>
+          <div class="history-cat ${CATEGORY_CLASS[r.category]}">${CATEGORY_LABELS[r.category]}対応</div>
+          <div class="history-del" onclick="deleteEntry('${r.id}')">取消</div>
+        </div>`;
+      }).join('')}
     </div>`;
   }
-  html += `<div class="total-row"><span>件数</span><span>${dayCount}件</span></div>`;
   el.innerHTML = html;
 }
 
