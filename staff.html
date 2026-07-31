@@ -71,8 +71,8 @@
 <div class="screen" id="screen-main">
   <div class="card">
     <div class="card-title">申請を追加</div>
-    <label class="form-label">対象日</label>
-    <input class="form-input" type="date" id="entry-date">
+    <label class="form-label">対象日（本日のみ・過去日は選択できません）</label>
+    <input class="form-input" type="date" id="entry-date" disabled style="background:#f5f5f5;color:#888;">
     <label class="form-label">時間</label>
     <select class="form-input" id="entry-time"></select>
     <label class="form-label">対応人数（タップで即申請）</label>
@@ -211,7 +211,7 @@ function renderHistory(){
         return `<div class="history-row">
           <div class="history-time">${timeStr}</div>
           <div class="history-cat ${CATEGORY_CLASS[r.category]}">${CATEGORY_LABELS[r.category]}対応</div>
-          <div class="history-del" onclick="deleteEntry('${r.id}')">取消</div>
+          ${isToday?`<div class="history-del" onclick="deleteEntry('${r.id}')">取消</div>`:''}
         </div>`;
       }).join('')}
     </div>`;
