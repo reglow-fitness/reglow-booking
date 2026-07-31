@@ -178,8 +178,10 @@ async function submitEntry(category){
   const time = document.getElementById('entry-time').value;
   if(!date||!time){toast('日付と時間を選択してください');return;}
   const sessionTime = new Date(`${date}T${time}:00`).toISOString();
+  const alreadyExists = historyEntries.some(r=>r.report_date===date && r.session_time===sessionTime);
+  if(alreadyExists){toast(`${time}は既に申請済みです。修正する場合は履歴の「取消」で削除してからタップし直してください`);return;}
   const {error} = await sbClient.from('session_reports').insert({staff_id: currentStaff.id, report_date: date, session_time: sessionTime, category, report_mode: 'single', booking_ids: []});
-  if(error){toast('送信に失敗しました');return;}
+  if(error){toast(error.code==='23505'?`${time}は既に申請済みです`:'送信に失敗しました');return;}
   toast(`${time} ${CATEGORY_LABELS[category]}対応で申請しました`);
   await loadHistory();
 }
