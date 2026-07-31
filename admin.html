@@ -1050,15 +1050,17 @@ function renderSessionReportDetail(){
   el.innerHTML=html;
 }
 async function updateReportCategory(id,category){
-  const{error}=await sbClient.from('session_reports').update({category:parseInt(category)}).eq('id',id);
-  if(error){showToast('更新に失敗しました（管理者ログインが必要な場合があります）');return;}
+  const{data,error}=await sbClient.from('session_reports').update({category:parseInt(category)}).eq('id',id).select();
+  if(error){showToast('更新に失敗しました: '+error.message);return;}
+  if(!data||!data.length){showToast('更新できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');await loadSessionReportSummary();return;}
   showToast('修正しました');
   await loadSessionReportSummary();
 }
 async function deleteReportEntry(id){
   if(!confirm('この申請を削除しますか？'))return;
-  const{error}=await sbClient.from('session_reports').delete().eq('id',id);
-  if(error){showToast('削除に失敗しました（管理者ログインが必要な場合があります）');return;}
+  const{data,error}=await sbClient.from('session_reports').delete().eq('id',id).select();
+  if(error){showToast('削除に失敗しました: '+error.message);return;}
+  if(!data||!data.length){showToast('削除できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');await loadSessionReportSummary();return;}
   showToast('削除しました');
   await loadSessionReportSummary();
 }
