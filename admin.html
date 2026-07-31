@@ -999,7 +999,7 @@ async function loadSessionReportSummary(){
   el.innerHTML='<div class="loading">集計中...</div>';
   const [y,m]=month.split('-').map(Number);
   const startDate=`${month}-01`;
-  const endDate=new Date(y,m,0).toISOString().slice(0,10);
+  const endDate=new Date(Date.UTC(y,m,0)).toISOString().slice(0,10);
   const{data:staffData}=await sbClient.from('staff').select('*');
   const{data:rateData}=await sbClient.from('staff_rates').select('*');
   const{data:reports,error}=await sbClient.from('session_reports').select('*').gte('report_date',startDate).lte('report_date',endDate);
