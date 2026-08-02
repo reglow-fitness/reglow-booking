@@ -997,6 +997,7 @@ async function loadSessionReportSummary(){
   if(!month){showToast('対象月を選択してください');return;}
   const el=document.getElementById('session-report-summary');
   el.innerHTML='<div class="loading">集計中...</div>';
+  expandedReportDates=new Set();
   const [y,m]=month.split('-').map(Number);
   const startDate=`${month}-01`;
   const endDate=new Date(Date.UTC(y,m,0)).toISOString().slice(0,10);
@@ -1029,25 +1030,61 @@ async function loadSessionReportSummary(){
   renderSessionReportDetail();
 }
 let lastSessionReportRaw=[];
+let expandedReportDates=new Set();
 function renderSessionReportDetail(){
   const el=document.getElementById('session-report-detail');
   if(!lastSessionReportRaw.length){el.innerHTML='<div class="loading">対象月の申請データがありません</div>';return;}
-  const sorted=[...lastSessionReportRaw].sort((a,b)=> (b.report_date+((b.session_time)||'')).localeCompare(a.report_date+((a.session_time)||'')));
-  let html='<table><thead><tr><th>日付</th><th>時間</th><th>スタッフ</th><th>人数</th><th>操作</th></tr></thead><tbody>';
-  for(const r of sorted){
-    const staffName=(allStaff.find(s=>s.id===r.staff_id)||{}).name||'（削除済スタッフ）';
-    const timeStr=r.session_time?new Date(r.session_time).toTimeString().slice(0,5):'—';
-    const catOptions=[1,2,3,0].map(c=>`<option value="${c}" ${r.category===c?'selected':''}>${SESSION_CATEGORY_LABELS[c]}</option>`).join('');
-    html+=`<tr>
-      <td>${r.report_date}</td>
-      <td>${timeStr}</td>
-      <td>${staffName}</td>
-      <td><select class="form-input" style="font-size:12px;padding:4px 6px;" onchange="updateReportCategory('${r.id}',this.value)">${catOptions}</select></td>
-      <td><button class="btn btn-sm btn-danger" onclick="deleteReportEntry('${r.id}')">削除</button></td>
-    </tr>`;
+  const byDate={};
+  for(const r of lastSessionReportRaw){
+    (byDate[r.report_date]=byDate[r.report_date]||[]).push(r);
   }
-  html+='</tbody></table>';
+  const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  const allOpen=expandedReportDates.size>=dates.length;
+  let html=`<div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn btn-sm" onclick="toggleAllReportDates()">${allOpen?'すべて閉じる':'すべて開く'}</button></div>`;
+  for(const date of dates){
+    const entries=byDate[date].sort((a,b)=>(b.session_time||'').localeCompare(a.session_time||''));
+    let dayTotal=0;
+    for(const r of entries)dayTotal+=getRate(r.staff_id,r.category);
+    const d=new Date(date+'T00:00:00');
+    const dateStr=`${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
+    const isOpen=expandedReportDates.has(date);
+    html+=`<div style="border:1px solid #eee;border-radius:8px;margin-bottom:8px;overflow:hidden;">
+      <div class="row-clickable" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fafafa;" onclick="toggleReportDate('${date}')">
+        <div style="font-weight:600;font-size:13px;">${dateStr}<span style="color:#aaa;font-weight:400;font-size:12px;margin-left:8px;">${entries.length}件</span></div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-weight:700;font-size:14px;">¥${dayTotal.toLocaleString()}</span>
+          <span style="font-size:11px;color:#aaa;">${isOpen?'▲':'▼'}</span>
+        </div>
+      </div>
+      <div id="report-date-panel-${date}" style="display:${isOpen?'':'none'};padding:0 14px 12px;">
+        <table><thead><tr><th>時間</th><th>スタッフ</th><th>人数</th><th>操作</th></tr></thead><tbody>
+        ${entries.map(r=>{
+          const staffName=(allStaff.find(s=>s.id===r.staff_id)||{}).name||'（削除済スタッフ）';
+          const timeStr=r.session_time?new Date(r.session_time).toTimeString().slice(0,5):'—';
+          const catOptions=[1,2,3,0].map(c=>`<option value="${c}" ${r.category===c?'selected':''}>${SESSION_CATEGORY_LABELS[c]}</option>`).join('');
+          return `<tr>
+            <td>${timeStr}</td>
+            <td>${staffName}</td>
+            <td><select class="form-input" style="font-size:12px;padding:4px 6px;" onchange="updateReportCategory('${r.id}',this.value)">${catOptions}</select></td>
+            <td><button class="btn btn-sm btn-danger" onclick="deleteReportEntry('${r.id}')">削除</button></td>
+          </tr>`;
+        }).join('')}
+        </tbody></table>
+      </div>
+    </div>`;
+  }
   el.innerHTML=html;
+}
+function toggleReportDate(date){
+  if(expandedReportDates.has(date))expandedReportDates.delete(date);
+  else expandedReportDates.add(date);
+  renderSessionReportDetail();
+}
+function toggleAllReportDates(){
+  const dates=[...new Set(lastSessionReportRaw.map(r=>r.report_date))];
+  if(expandedReportDates.size>=dates.length)expandedReportDates.clear();
+  else expandedReportDates=new Set(dates);
+  renderSessionReportDetail();
 }
 async function updateReportCategory(id,category){
   const{data,error}=await sbClient.from('session_reports').update({category:parseInt(category)}).eq('id',id).select();
