@@ -338,6 +338,22 @@
           <button class="btn btn-danger" id="delete-old-slots-btn" style="display:none;" onclick="deleteOldSlots()">🗑 先月以前を一括削除する</button>
         </div>
       </div>
+      <!-- ★ 未来の予約枠を一括で白紙にする -->
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:8px;">📅 未来の予約枠を一括で白紙にする（受付不可にする）</strong>
+        <p style="font-size:13px;color:#888;margin-bottom:14px;line-height:1.7;">指定した期間を丸ごと「予約受付不可」にします。週間テンプレートより優先されるため、スタッフシフトが未定の期間をお客様が予約できないようにブロックできます。<br>後で個別に予約枠管理から解除・編集することもできます。</p>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+          <input type="date" class="form-input" id="blank-start-date" style="width:160px;">
+          <span style="font-size:13px;color:#888;">〜</span>
+          <input type="date" class="form-input" id="blank-end-date" style="width:160px;">
+        </div>
+        <div id="blank-slot-preview" style="margin-bottom:12px;font-size:13px;color:#555;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn" onclick="previewBlankSlots()">🔍 対象を確認する</button>
+          <button class="btn btn-danger" id="blank-slots-btn" style="display:none;" onclick="executeBlankSlots()">🚫 この期間を白紙にする</button>
+          <button class="btn" onclick="undoBlankSlots()">↩️ この期間の設定を削除して戻す</button>
+        </div>
+      </div>
       <!-- ★ 期限切れチケット一括削除 -->
       <div class="card">
         <strong style="font-size:14px;display:block;margin-bottom:8px;">🗑 期限切れチケットの削除</strong>
@@ -804,6 +820,48 @@ async function deleteOldSlots(){
   document.getElementById('delete-old-slots-btn').style.display='none';
   showToast(`${data.length}件の古い設定を削除しました`);
 }
+function getBlankSlotDates(){
+  const start=document.getElementById('blank-start-date').value;
+  const end=document.getElementById('blank-end-date').value;
+  if(!start||!end)return null;
+  const dates=[];
+  let d=new Date(start+'T00:00:00');
+  const endD=new Date(end+'T00:00:00');
+  if(endD<d)return null;
+  while(d<=endD){dates.push(toLocalDateStr(d));d.setDate(d.getDate()+1);}
+  return{start,end,dates};
+}
+function previewBlankSlots(){
+  const res=getBlankSlotDates();
+  const el=document.getElementById('blank-slot-preview');
+  const btn=document.getElementById('blank-slots-btn');
+  if(!res){showToast('開始日と終了日を正しく入力してください');btn.style.display='none';return;}
+  el.innerHTML=`<div style="background:#fff3cd;border-radius:8px;padding:10px 14px;"><strong style="color:#8a6000;">対象：${res.dates.length}日分</strong>（${res.start} 〜 ${res.end}）を予約受付不可にします</div>`;
+  btn.style.display='';
+}
+async function executeBlankSlots(){
+  const res=getBlankSlotDates();
+  if(!res){showToast('開始日と終了日を入力してください');return;}
+  if(!confirm(`${res.start} 〜 ${res.end}（${res.dates.length}日分）を予約受付不可にします。よろしいですか？`))return;
+  const rows=res.dates.map(ds=>({date:ds,is_closed:true,available_slots:[],semi_max_per_slot:{},taiken_max_per_slot:{}}));
+  const{error}=await sbClient.from('slot_settings').upsert(rows,{onConflict:'date'});
+  if(error){showToast('設定に失敗しました: '+error.message);return;}
+  document.getElementById('blank-slot-preview').innerHTML='<span style="color:#06C755;">✅ 白紙にしました</span>';
+  document.getElementById('blank-slots-btn').style.display='none';
+  showToast(`${res.dates.length}日分を白紙にしました`);
+  await renderSlotWeekCalendar();
+}
+async function undoBlankSlots(){
+  const res=getBlankSlotDates();
+  if(!res){showToast('開始日と終了日を入力してください');return;}
+  if(!confirm(`${res.start} 〜 ${res.end} の日付指定設定をすべて削除し、週間テンプレートの内容に戻しますか？\nこの期間に他の目的で個別設定していた日程も削除されます。`))return;
+  const{error}=await sbClient.from('slot_settings').delete().gte('date',res.start).lte('date',res.end);
+  if(error){showToast('削除に失敗しました: '+error.message);return;}
+  document.getElementById('blank-slot-preview').innerHTML='<span style="color:#06C755;">✅ 週間テンプレートの内容に戻しました</span>';
+  document.getElementById('blank-slots-btn').style.display='none';
+  showToast(`${res.start} 〜 ${res.end} の設定を削除しました`);
+  await renderSlotWeekCalendar();
+}
 async function previewExpiredTickets(){
   if(!sbClient){showToast('Supabaseが未接続です');return;}
   const todayStr=new Date().toISOString().slice(0,10);
@@ -1099,6 +1157,13 @@ window.addEventListener('DOMContentLoaded',async ()=>{
   document.getElementById('setting-url').value=FIXED_URL;
   document.getElementById('setting-key').value=FIXED_KEY;
   sbClient=window.supabase.createClient(FIXED_URL,FIXED_KEY);
+  const nowD=new Date();
+  const nextMonthStart=new Date(nowD.getFullYear(),nowD.getMonth()+1,1);
+  const oneYearLater=new Date(nextMonthStart);
+  oneYearLater.setFullYear(oneYearLater.getFullYear()+1);
+  oneYearLater.setDate(oneYearLater.getDate()-1);
+  document.getElementById('blank-start-date').value=toLocalDateStr(nextMonthStart);
+  document.getElementById('blank-end-date').value=toLocalDateStr(oneYearLater);
   showPage('dashboard',document.querySelector('nav a:first-child'));
   setBottomNav('bn-dashboard');
   const{data:{session}}=await sbClient.auth.getSession();
