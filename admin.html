@@ -340,8 +340,8 @@
       </div>
       <!-- ★ 未来の予約枠を一括で白紙にする -->
       <div class="card">
-        <strong style="font-size:14px;display:block;margin-bottom:8px;">📅 未来の予約枠を一括で白紙にする（受付不可にする）</strong>
-        <p style="font-size:13px;color:#888;margin-bottom:14px;line-height:1.7;">指定した期間を丸ごと「予約受付不可」にします。週間テンプレートより優先されるため、スタッフシフトが未定の期間をお客様が予約できないようにブロックできます。<br>後で個別に予約枠管理から解除・編集することもできます。</p>
+        <strong style="font-size:14px;display:block;margin-bottom:8px;">📅 未来の予約枠を一括で白紙にする</strong>
+        <p style="font-size:13px;color:#888;margin-bottom:14px;line-height:1.7;">指定した期間の受付枠を空にします（「休業日」表記にはなりません。予約できる時間帯が単純に無い状態になります）。週間テンプレートより優先されるため、シフト未定の期間をお客様が予約できないようにブロックできます。<br>シフトが決まったら、この期間内の日付を予約枠管理から個別に編集して時間帯を設定してください。</p>
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
           <input type="date" class="form-input" id="blank-start-date" style="width:160px;">
           <span style="font-size:13px;color:#888;">〜</span>
@@ -842,11 +842,24 @@ function previewBlankSlots(){
 async function executeBlankSlots(){
   const res=getBlankSlotDates();
   if(!res){showToast('開始日と終了日を入力してください');return;}
-  if(!confirm(`${res.start} 〜 ${res.end}（${res.dates.length}日分）を予約受付不可にします。よろしいですか？`))return;
-  const rows=res.dates.map(ds=>({date:ds,is_closed:true,available_slots:[],semi_max_per_slot:{},taiken_max_per_slot:{}}));
-  const{error}=await sbClient.from('slot_settings').upsert(rows,{onConflict:'date'});
-  if(error){showToast('設定に失敗しました: '+error.message);return;}
-  document.getElementById('blank-slot-preview').innerHTML='<span style="color:#06C755;">✅ 白紙にしました</span>';
+  if(!confirm(`${res.start} 〜 ${res.end}（${res.dates.length}日分）を白紙（受付枠なし・休業表記はしない）にします。よろしいですか？`))return;
+  // ★ upsert/onConflictは date に一意制約が無いと重複行を作ってしまうことがあるため、
+  //    既存行と新規行を分けてupdate/insertする（1日=1行を保証する）
+  const{data:existingRows,error:selErr}=await sbClient.from('slot_settings').select('date').gte('date',res.start).lte('date',res.end);
+  if(selErr){showToast('確認に失敗しました: '+selErr.message);return;}
+  const existingDates=new Set((existingRows||[]).map(r=>r.date));
+  const toUpdate=res.dates.filter(d=>existingDates.has(d));
+  const toInsert=res.dates.filter(d=>!existingDates.has(d));
+  const blankFields={is_closed:false,available_slots:[],semi_max_per_slot:{},taiken_max_per_slot:{}};
+  if(toUpdate.length){
+    const{error:updErr}=await sbClient.from('slot_settings').update(blankFields).in('date',toUpdate);
+    if(updErr){showToast('更新に失敗しました: '+updErr.message);return;}
+  }
+  if(toInsert.length){
+    const{error:insErr}=await sbClient.from('slot_settings').insert(toInsert.map(ds=>({date:ds,...blankFields})));
+    if(insErr){showToast('追加に失敗しました: '+insErr.message);return;}
+  }
+  document.getElementById('blank-slot-preview').innerHTML='<span style="color:#06C755;">✅ 白紙にしました（休業表記はされません）</span>';
   document.getElementById('blank-slots-btn').style.display='none';
   showToast(`${res.dates.length}日分を白紙にしました`);
   await renderSlotWeekCalendar();
