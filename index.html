@@ -191,7 +191,7 @@
     <div class="confirm-datetime-value" id="confirm-datetime">—</div>
     <div class="confirm-datetime-check">⚠️ 日時をよくご確認ください</div>
   </div>
-  <div class="confirm-warn" id="confirm-warn-cancel">キャンセルは予約12時間前まで受け付けます</div>
+  <div class="confirm-warn" id="confirm-warn-cancel">キャンセルは予約2時間前まで受け付けます</div>
   <button class="cta-btn" id="confirm-submit-btn" onclick="submitBooking()">この日時で予約を確定する</button>
   <button class="cta-btn outline" onclick="goBack()">日時を変更する</button>
   <div class="pb"></div>
@@ -438,7 +438,7 @@ function selectMenu(menu, viewOnly = false) {
     notice.textContent = '空き状況のみ確認できます。ご予約はチケット付与後にスタッフまでお問い合わせください。';
   } else if (isSemi) {
     notice.style.display = 'block';
-    notice.textContent = '1回分のチケットが消化されます。予約確定後のキャンセルは12時間前まで受け付けます。';
+    notice.textContent = '1回分のチケットが消化されます。予約確定後のキャンセルは2時間前まで受け付けます。';
   } else {
     notice.style.display = 'none';
   }
@@ -829,13 +829,26 @@ async function loadMyBookings(){
   const dn=['日','月','火','水','木','金','土'];
   el.innerHTML=data.map(b=>{const dt=new Date(b.scheduled_at);const isPast=dt<new Date();return`<div class="history-item" style="margin-top:8px;"><div class="history-date">${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日（${dn[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}</div><div class="history-title">${b.menu_name||'セミパーソナル60分'}</div><span class="history-badge">確定</span>${!isPast?`<button style="float:right;background:none;border:1px solid #f5c6c6;border-radius:6px;padding:3px 10px;font-size:11px;color:#e74c3c;cursor:pointer;margin-top:4px;" onclick="cancelBooking('${b.id}','${b.ticket_id}','${b.scheduled_at}',${b.menus?.ticket_cost||0})">キャンセル</button>`:''}</div>`;}).join('');
 }
+const MONTHLY_FREE_LATE_CANCELS = 2;
 async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
   const now = new Date();
   const scheduled = new Date(scheduledAt);
   const diffHours = (scheduled - now) / (1000 * 60 * 60);
   const isUnlimitedCancel = currentTicket?.plan_type === 'unlimited';
-  if(diffHours < 12 && menuTicketCost > 0 && !isUnlimitedCancel){
-    if(!confirm('予約まで12時間を切っています。キャンセルしてもチケット1回が消化されます。よろしいですか？'))return;
+  let useGraceQuota = false;
+  if(diffHours < 2 && menuTicketCost > 0 && !isUnlimitedCancel){
+    // ★ 月2回までの無条件キャンセル猶予（暦月リセット）をチェック
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const {count} = await sbClient.from('bookings').select('id',{count:'exact',head:true})
+      .eq('customer_id', currentCustomer.id).eq('status','cancelled').eq('late_cancel_forgiven', true)
+      .gte('cancelled_at', monthStart);
+    const used = count || 0;
+    if(used < MONTHLY_FREE_LATE_CANCELS){
+      useGraceQuota = true;
+      if(!confirm(`予約まで2時間を切っていますが、今月の無条件キャンセル猶予（残り${MONTHLY_FREE_LATE_CANCELS-used}回）を使ってキャンセルします。チケットは消化されません。よろしいですか？`))return;
+    } else {
+      if(!confirm('予約まで2時間を切っています。今月の無条件キャンセル猶予（月2回）を使い切っているため、キャンセルするとチケット1回が消化されます。よろしいですか？'))return;
+    }
   } else {
     if(!confirm('この予約をキャンセルしますか？'))return;
   }
@@ -847,12 +860,12 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
       body: JSON.stringify({action:'delete', eventId: booking.gcal_event_id})
     }).catch(e=>console.log('GCal delete error:',e));
   }
-  await sbClient.from('bookings').update({status:'cancelled'}).eq('id',id);
+  await sbClient.from('bookings').update({status:'cancelled', cancelled_at: now.toISOString(), late_cancel_forgiven: useGraceQuota}).eq('id',id);
   if(booking?.ticket_id){
     const {data:latestTicket} = await sbClient.from('tickets').select('*').eq('id',booking.ticket_id).single();
     if(latestTicket && latestTicket.plan_type !== 'unlimited'){
       const diffH = (new Date(scheduledAt) - new Date()) / (1000 * 60 * 60);
-      if(diffH >= 12){
+      if(diffH >= 2 || useGraceQuota){
         const isCouponTicket = latestTicket.plan_type === 'coupon';
         // ★ 回数券はtotal_countがnullなので上限なしで戻す、通常プランはtotal_count以内で戻す
         const newRemaining = isCouponTicket
