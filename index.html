@@ -536,7 +536,9 @@ async function renderTimeSlots(ds) {
     return;
   }
   const baseSlots = availableSlots && availableSlots.length > 0 ? availableSlots : [];
-  const activeSlots = baseSlots.filter(s => !blockedSlots.includes(s));
+  // ★ 過去の時間帯（今日の場合、現在時刻より前の枠）を予約対象から除外
+  const nowForFilter = new Date();
+  const activeSlots = baseSlots.filter(s => !blockedSlots.includes(s) && new Date(ds+'T'+s+':00') > nowForFilter);
   let html = '';
   for(const slot of activeSlots){
     const [h] = slot.split(':');
@@ -627,6 +629,18 @@ function renderConfirm(){
 async function submitBooking(){
   const btn=document.getElementById('confirm-submit-btn');
   btn.disabled=true;btn.textContent='送信中...';
+  // ★ 過去の日時への予約を防ぐ最終チェック（カレンダー表示の不具合等で選択されてしまった場合の保険）
+  {
+    const [ch0, cm0] = selectedTime.split(':');
+    const checkDt = new Date(selectedDate);
+    checkDt.setHours(parseInt(ch0), parseInt(cm0), 0, 0);
+    if(checkDt <= new Date()){
+      btn.disabled=false; btn.textContent='この日時で予約を確定する';
+      alert('選択した日時はすでに過ぎています。お手数ですが、日時を選び直してください。');
+      goScreen('screen-calendar');
+      return;
+    }
+  }
   const bookingTicket = getTicketForDate(selectedDate);
   const needsTicket = selectedMenu.ticket_cost > 0;
   if(needsTicket && !bookingTicket){
