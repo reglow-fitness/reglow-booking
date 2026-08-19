@@ -586,9 +586,9 @@ async function renderTimeSlots(ds) {
     const trioBadge = slotSemiMax === 3
       ? `<span style="font-size:9px;background:#e8f1fc;color:#1a56a0;padding:1px 5px;border-radius:99px;font-weight:700;margin-left:4px;vertical-align:middle;">1対3</span>`
       : '';
-    const staffName = staffPerSlot[slot] || '';
-    const staffBadge = staffName
-      ? `<span style="font-size:9px;background:#fff3cd;color:#8a6000;padding:1px 5px;border-radius:99px;font-weight:700;margin-left:4px;vertical-align:middle;">${staffName}</span>`
+    const staffAtSlot = Array.isArray(staffPerSlot[slot]) ? staffPerSlot[slot] : (staffPerSlot[slot] ? [staffPerSlot[slot]] : []);
+    const staffBadge = staffAtSlot.length
+      ? `<span style="font-size:9px;background:#fff3cd;color:#8a6000;padding:1px 5px;border-radius:99px;font-weight:700;margin-left:4px;vertical-align:middle;">${staffAtSlot.join('・')}</span>`
       : '';
     if(isFull) html+=`<div class="time-slot full">${slot}${trioBadge}${staffBadge}</div>`;
     else html+=`<div class="time-slot${isSel?' selected':''}" onclick="selectTime('${slot}')">${slot}${remainLabel}${trioBadge}${staffBadge}</div>`;
