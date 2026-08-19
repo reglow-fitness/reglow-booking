@@ -153,6 +153,7 @@
       <a onclick="showPage('slots',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 1v4M11 1v4M1 7h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 10h2M7 10h2M10 10h2M4 13h2M7 13h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>予約枠管理</a>
       <a onclick="showPage('staffmanage',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="11" cy="6" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 14c0-2.5 1.8-4 4-4s4 1.5 4 4M9.5 14c0-2-1.2-3.3-2.5-3.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>スタッフ管理</a>
       <a onclick="showPage('sessionreports',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 13V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10l-3-2-3 2-3-2-3 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 5.5h6M5 8h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>セッション集計</a>
+      <a onclick="showPage('dependency',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 2v10a1 1 0 0 0 1 1h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 11V7M8.5 11V4M12 11V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>依存度モニタリング</a>
       <a class="active" onclick="showPage('settings',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>設定</a>
     </nav>
   </div>
@@ -330,6 +331,35 @@
         <div id="session-report-detail"><div class="loading">対象月を選んで「集計する」を押してください</div></div>
       </div>
     </div>
+    <!-- 依存度モニタリング -->
+    <div class="page" id="page-dependency">
+      <div class="page-title">依存度モニタリング</div>
+      <div class="card">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <label class="form-label" style="margin:0;">対象スタッフ</label>
+          <select class="form-input" id="dependency-staff-select" style="width:auto;"><option value="">スタッフを選択</option></select>
+          <label class="form-label" style="margin:0;">遡る期間</label>
+          <select class="form-input" id="dependency-months" style="width:auto;">
+            <option value="3">直近3ヶ月</option>
+            <option value="6" selected>直近6ヶ月</option>
+            <option value="12">直近12ヶ月</option>
+          </select>
+          <button class="btn btn-primary" onclick="loadDependencyMonitoring()">集計する</button>
+        </div>
+      </div>
+      <div class="card">
+        <div id="dependency-summary"><div class="loading">対象スタッフと期間を選んで「集計する」を押してください</div></div>
+      </div>
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:10px;">月別推移</strong>
+        <div id="dependency-monthly-table"></div>
+      </div>
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:4px;">全スタッフ横並び（クロス集計）</strong>
+        <p style="font-size:12px;color:#888;margin-bottom:14px;">対象スタッフの列を緑色でハイライトしています。</p>
+        <div id="dependency-cross-table"></div>
+      </div>
+    </div>
     <div class="page active" id="page-settings">
       <div class="page-title">設定</div>
       <div class="card">
@@ -397,6 +427,9 @@
   </button>
   <button class="bottom-nav-item" id="bn-sessionreports" onclick="showPage('sessionreports',null);setBottomNav('bn-sessionreports')">
     <svg viewBox="0 0 16 16" fill="none"><path d="M2 13V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10l-3-2-3 2-3-2-3 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>集計
+  </button>
+  <button class="bottom-nav-item" id="bn-dependency" onclick="showPage('dependency',null);setBottomNav('bn-dependency')">
+    <svg viewBox="0 0 16 16" fill="none"><path d="M2 2v10a1 1 0 0 0 1 1h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 11V7M8.5 11V4M12 11V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>依存度
   </button>
   <button class="bottom-nav-item" id="bn-settings" onclick="showPage('settings',null);setBottomNav('bn-settings')">
     <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>設定
@@ -487,7 +520,7 @@ function isCoupon(planType){return planType==='coupon';}
 function setBottomNav(id){document.querySelectorAll('.bottom-nav-item').forEach(e=>e.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');}
 function initSupabase(){const url=document.getElementById('setting-url').value.trim()||'https://plapbyvgthymszrzbsgl.supabase.co';const key=document.getElementById('setting-key').value.trim()||'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';if(url&&key){sbClient=window.supabase.createClient(url,key);return true;}return false;}
 function saveSettings(){const url=document.getElementById('setting-url').value.trim();const key=document.getElementById('setting-key').value.trim();if(!url||!key){showToast('URLとキーを入力してください');return;}sbClient=window.supabase.createClient(url,key);document.getElementById('setting-status').textContent='✅ 接続しました！';showToast('接続しました！');showPage('dashboard',null);setBottomNav('bn-dashboard');loadAll();}
-function showPage(name,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');if(el&&el.tagName==='A')el.classList.add('active');if(name==='clients')renderClients();if(name==='bookings')loadBookings();if(name==='dashboard')loadDashboard();if(name==='slots')initSlotWeek();if(name==='staffmanage')loadStaffManage();if(name==='sessionreports')initSessionReportsPage();}
+function showPage(name,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');if(el&&el.tagName==='A')el.classList.add('active');if(name==='clients')renderClients();if(name==='bookings')loadBookings();if(name==='dashboard')loadDashboard();if(name==='slots')initSlotWeek();if(name==='staffmanage')loadStaffManage();if(name==='sessionreports')initSessionReportsPage();if(name==='dependency')initDependencyPage();}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
@@ -1261,6 +1294,101 @@ function exportSessionReportCSV(){
   const a=document.createElement('a');
   a.href=url;a.download=`session_report_${month}.csv`;a.click();
   URL.revokeObjectURL(url);
+}
+/* ===================== 依存度モニタリング ===================== */
+async function initDependencyPage(){
+  await ensureStaffLoaded();
+  const sel=document.getElementById('dependency-staff-select');
+  const prevValue=sel.value;
+  sel.innerHTML='<option value="">スタッフを選択</option>'+[...allStaff].sort((a,b)=>a.name.localeCompare(b.name,'ja')).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  if(prevValue)sel.value=prevValue;
+}
+function dependencyMonthKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+function dependencyMonthLabel(key){const[y,m]=key.split('-');return `${y}年${parseInt(m)}月`;}
+async function loadDependencyMonitoring(){
+  const staffId=document.getElementById('dependency-staff-select').value;
+  const monthsBack=parseInt(document.getElementById('dependency-months').value);
+  if(!staffId){showToast('対象スタッフを選択してください');return;}
+  document.getElementById('dependency-summary').innerHTML='<div class="loading">集計中...</div>';
+  document.getElementById('dependency-monthly-table').innerHTML='';
+  document.getElementById('dependency-cross-table').innerHTML='';
+
+  // 対象期間の月リストを作成（古い月→新しい月の順）
+  const now=new Date();
+  const months=[];
+  for(let i=monthsBack-1;i>=0;i--){
+    const d=new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const key=dependencyMonthKey(d);
+    const start=`${key}-01`;
+    const endDate=new Date(d.getFullYear(), d.getMonth()+1, 0);
+    const end=toLocalDateStr(endDate);
+    months.push({key,label:dependencyMonthLabel(key),start,end});
+  }
+  const rangeStart=months[0].start;
+  const rangeEnd=months[months.length-1].end;
+
+  // 既存のセッション集計と同じデータソース（session_reports）を使用
+  const{data:reports,error}=await sbClient.from('session_reports').select('staff_id, report_date').gte('report_date',rangeStart).lte('report_date',rangeEnd);
+  if(error){document.getElementById('dependency-summary').innerHTML='<div class="loading">集計に失敗しました（テーブルが未作成の可能性があります）</div>';return;}
+
+  const monthlyByStaff={};
+  const monthlyTotal={};
+  for(const m of months){monthlyByStaff[m.key]={};monthlyTotal[m.key]=0;}
+  for(const r of (reports||[])){
+    const mk=(r.report_date||'').slice(0,7);
+    if(!(mk in monthlyByStaff))continue;
+    monthlyByStaff[mk][r.staff_id]=(monthlyByStaff[mk][r.staff_id]||0)+1;
+    monthlyTotal[mk]=(monthlyTotal[mk]||0)+1;
+  }
+
+  const findStaffName=id=>{const s=allStaff.find(s=>s.id===id);return s?s.name:'（削除済スタッフ）';};
+  const targetName=findStaffName(staffId);
+
+  // 月別推移テーブル
+  let mainHtml='<table><thead><tr><th>月</th><th>全体対応件数</th><th>'+targetName+'の対応件数</th><th>シェア</th></tr></thead><tbody>';
+  const shares=[];
+  for(const m of months){
+    const total=monthlyTotal[m.key]||0;
+    const cnt=monthlyByStaff[m.key][staffId]||0;
+    const share=total>0?Math.round((cnt/total)*1000)/10:0;
+    shares.push(share);
+    const barClass=share>50?'bar-red':share>30?'bar-amber':'bar-green';
+    mainHtml+=`<tr><td style="font-weight:600;">${m.label}</td><td>${total}</td><td>${cnt}</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${barClass}" style="width:${share}%"></div></div><div class="bar-text">${share}%</div></div></td></tr>`;
+  }
+  mainHtml+='</tbody></table>';
+  document.getElementById('dependency-monthly-table').innerHTML=mainHtml;
+
+  // サマリー（最初の月 vs 最後の月のシェア比較）
+  const firstShare=shares[0]??0;
+  const lastShare=shares[shares.length-1]??0;
+  const diff=Math.round((lastShare-firstShare)*10)/10;
+  let trendLabel,trendClass;
+  if(diff>0.05){trendLabel=`+${diff}pt（上昇）`;trendClass='badge-red';}
+  else if(diff<-0.05){trendLabel=`${diff}pt（低下）`;trendClass='badge-green';}
+  else{trendLabel='変化なし';trendClass='badge-gray';}
+  document.getElementById('dependency-summary').innerHTML=`
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div><div style="font-size:12px;color:#888;">${months[0].label}のシェア</div><div style="font-size:22px;font-weight:700;">${firstShare}%</div></div>
+      <div style="font-size:20px;color:#ccc;">→</div>
+      <div><div style="font-size:12px;color:#888;">${months[months.length-1].label}のシェア</div><div style="font-size:22px;font-weight:700;">${lastShare}%</div></div>
+      <span class="badge ${trendClass}" style="font-size:13px;padding:6px 14px;">${trendLabel}</span>
+    </div>
+    <p style="font-size:12px;color:#888;margin-top:10px;">${targetName} が対応した件数 ÷ 全体対応件数 で算出したシェアの推移です（データソース：セッション集計と同じ session_reports）。</p>
+  `;
+
+  // クロス集計（全スタッフ横並び、対象スタッフの列を強調）
+  const staffList=[...allStaff].sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  let crossHtml='<table><thead><tr><th>月</th>'+staffList.map(s=>`<th style="${s.id===staffId?'color:#06C755;':''}">${s.name}${s.id===staffId?' ★':''}</th>`).join('')+'<th>合計</th></tr></thead><tbody>';
+  for(const m of months){
+    crossHtml+=`<tr><td style="font-weight:600;">${m.label}</td>`;
+    for(const s of staffList){
+      const cnt=monthlyByStaff[m.key][s.id]||0;
+      crossHtml+=`<td style="${s.id===staffId?'background:#f0fdf4;font-weight:700;':''}">${cnt}</td>`;
+    }
+    crossHtml+=`<td style="font-weight:600;color:#888;">${monthlyTotal[m.key]||0}</td></tr>`;
+  }
+  crossHtml+='</tbody></table>';
+  document.getElementById('dependency-cross-table').innerHTML=crossHtml;
 }
 window.addEventListener('DOMContentLoaded',async ()=>{
   const FIXED_URL='https://plapbyvgthymszrzbsgl.supabase.co';
