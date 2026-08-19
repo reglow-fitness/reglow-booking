@@ -495,18 +495,21 @@ async function renderTimeSlots(ds) {
   let semiMaxPerSlot = {};
   let blockedSlots = [];
   let taikenMaxPerSlot = {};
+  let staffPerSlot = {};
   if (slotSetting) {
     isClosed = slotSetting.is_closed;
     availableSlots = slotSetting.available_slots;
     semiMaxPerSlot = slotSetting.semi_max_per_slot || {};
     blockedSlots = slotSetting.blocked_slots || [];
     taikenMaxPerSlot = slotSetting.taiken_max_per_slot || {};
+    staffPerSlot = slotSetting.staff_per_slot || {};
   } else if (weeklySetting) {
     isClosed = weeklySetting.is_closed;
     availableSlots = weeklySetting.available_slots;
     semiMaxPerSlot = weeklySetting.semi_max_per_slot || {};
     blockedSlots = weeklySetting.blocked_slots || [];
     taikenMaxPerSlot = weeklySetting.taiken_max_per_slot || {};
+    staffPerSlot = weeklySetting.staff_per_slot || {};
   }
   const d=new Date(ds);
   const dn=['日','月','火','水','木','金','土'];
@@ -583,8 +586,12 @@ async function renderTimeSlots(ds) {
     const trioBadge = slotSemiMax === 3
       ? `<span style="font-size:9px;background:#e8f1fc;color:#1a56a0;padding:1px 5px;border-radius:99px;font-weight:700;margin-left:4px;vertical-align:middle;">1対3</span>`
       : '';
-    if(isFull) html+=`<div class="time-slot full">${slot}${trioBadge}</div>`;
-    else html+=`<div class="time-slot${isSel?' selected':''}" onclick="selectTime('${slot}')">${slot}${remainLabel}${trioBadge}</div>`;
+    const staffName = staffPerSlot[slot] || '';
+    const staffBadge = staffName
+      ? `<span style="font-size:9px;background:#fff3cd;color:#8a6000;padding:1px 5px;border-radius:99px;font-weight:700;margin-left:4px;vertical-align:middle;">${staffName}</span>`
+      : '';
+    if(isFull) html+=`<div class="time-slot full">${slot}${trioBadge}${staffBadge}</div>`;
+    else html+=`<div class="time-slot${isSel?' selected':''}" onclick="selectTime('${slot}')">${slot}${remainLabel}${trioBadge}${staffBadge}</div>`;
   }
   if(activeSlots.length === 0){
     html = '<div style="color:#aaa;font-size:13px;">この日は予約できる時間帯がありません</div>';
