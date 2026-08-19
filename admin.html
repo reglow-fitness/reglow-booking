@@ -153,7 +153,6 @@
       <a onclick="showPage('slots',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 1v4M11 1v4M1 7h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 10h2M7 10h2M10 10h2M4 13h2M7 13h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>予約枠管理</a>
       <a onclick="showPage('staffmanage',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="11" cy="6" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 14c0-2.5 1.8-4 4-4s4 1.5 4 4M9.5 14c0-2-1.2-3.3-2.5-3.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>スタッフ管理</a>
       <a onclick="showPage('sessionreports',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 13V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10l-3-2-3 2-3-2-3 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 5.5h6M5 8h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>セッション集計</a>
-      <a onclick="showPage('dependency',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 14V2M2 14h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 11V8M8 11V5M11 11V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>依存度モニタリング</a>
       <a class="active" onclick="showPage('settings',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>設定</a>
     </nav>
   </div>
@@ -209,7 +208,8 @@
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <div style="display:flex;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
             <button class="btn" id="view-calendar-btn" onclick="setBookingView('calendar')" style="border:none;border-radius:0;border-right:1px solid #ddd;">📅 週間</button>
-            <button class="btn" id="view-list-btn" onclick="setBookingView('list')" style="border:none;border-radius:0;">📋 リスト</button>
+            <button class="btn" id="view-list-btn" onclick="setBookingView('list')" style="border:none;border-radius:0;border-right:1px solid #ddd;">📋 リスト</button>
+            <button class="btn" id="view-activity-btn" onclick="setBookingView('activity')" style="border:none;border-radius:0;">🕒 アクティビティ</button>
           </div>
           <button class="btn btn-primary" onclick="openAddBookingModal()">+ 予約追加</button>
         </div>
@@ -226,6 +226,13 @@
       </div>
       <div id="booking-list-view" style="display:none;">
         <div class="card" style="padding:0;"><div id="booking-list"><div class="loading">読み込み中...</div></div></div>
+      </div>
+      <div id="booking-activity-view" style="display:none;">
+        <div class="card" style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;">
+          <p style="font-size:12px;color:#888;line-height:1.6;margin:0;">直近の「予約」「キャンセル」を新しい順に表示します（自動更新はされません。最新の状況を見たいときはこのボタンを押してください）。</p>
+          <button class="btn btn-sm" onclick="loadActivityLog()">🔄 更新</button>
+        </div>
+        <div class="card" style="padding:0;"><div id="activity-log-list"><div class="loading">読み込み中...</div></div></div>
       </div>
     </div>
     <!-- 予約枠管理 -->
@@ -323,33 +330,6 @@
         <div id="session-report-detail"><div class="loading">対象月を選んで「集計する」を押してください</div></div>
       </div>
     </div>
-    <!-- 依存度モニタリング -->
-    <div class="page" id="page-dependency">
-      <div class="page-title">依存度モニタリング</div>
-      <div class="card">
-        <p style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.7;">セッション申請データをもとに、月ごとのスタッフ別対応比率の推移を確認できます。特定スタッフへの依存度が下がっているかを継続的に確認する用途です。</p>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <label class="form-label" style="margin:0;">対象スタッフ（依存度を追う相手）</label>
-          <select class="form-input" id="dep-target-staff" style="width:auto;"></select>
-          <label class="form-label" style="margin:0;">遡る月数</label>
-          <select class="form-input" id="dep-month-range" style="width:auto;">
-            <option value="3">直近3ヶ月</option>
-            <option value="6" selected>直近6ヶ月</option>
-            <option value="12">直近12ヶ月</option>
-          </select>
-          <button class="btn btn-primary" onclick="loadDependencyReport()">集計する</button>
-        </div>
-      </div>
-      <div class="card">
-        <strong style="font-size:14px;display:block;margin-bottom:14px;">月別シェア推移（セッション対応件数ベース）</strong>
-        <div id="dependency-summary"><div class="loading">対象スタッフを選んで「集計する」を押してください</div></div>
-      </div>
-      <div class="card">
-        <strong style="font-size:14px;display:block;margin-bottom:4px;">月別・スタッフ別 対応件数と報酬</strong>
-        <p style="font-size:12px;color:#888;margin-bottom:14px;">セッション集計ページと同じ元データですが、複数月を横並びで比較できます。</p>
-        <div id="dependency-detail"><div class="loading">対象スタッフを選んで「集計する」を押してください</div></div>
-      </div>
-    </div>
     <div class="page active" id="page-settings">
       <div class="page-title">設定</div>
       <div class="card">
@@ -417,9 +397,6 @@
   </button>
   <button class="bottom-nav-item" id="bn-sessionreports" onclick="showPage('sessionreports',null);setBottomNav('bn-sessionreports')">
     <svg viewBox="0 0 16 16" fill="none"><path d="M2 13V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10l-3-2-3 2-3-2-3 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>集計
-  </button>
-  <button class="bottom-nav-item" id="bn-dependency" onclick="showPage('dependency',null);setBottomNav('bn-dependency')">
-    <svg viewBox="0 0 16 16" fill="none"><path d="M2 14V2M2 14h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 11V8M8 11V5M11 11V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>依存度
   </button>
   <button class="bottom-nav-item" id="bn-settings" onclick="showPage('settings',null);setBottomNav('bn-settings')">
     <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>設定
@@ -510,7 +487,7 @@ function isCoupon(planType){return planType==='coupon';}
 function setBottomNav(id){document.querySelectorAll('.bottom-nav-item').forEach(e=>e.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');}
 function initSupabase(){const url=document.getElementById('setting-url').value.trim()||'https://plapbyvgthymszrzbsgl.supabase.co';const key=document.getElementById('setting-key').value.trim()||'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';if(url&&key){sbClient=window.supabase.createClient(url,key);return true;}return false;}
 function saveSettings(){const url=document.getElementById('setting-url').value.trim();const key=document.getElementById('setting-key').value.trim();if(!url||!key){showToast('URLとキーを入力してください');return;}sbClient=window.supabase.createClient(url,key);document.getElementById('setting-status').textContent='✅ 接続しました！';showToast('接続しました！');showPage('dashboard',null);setBottomNav('bn-dashboard');loadAll();}
-function showPage(name,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');if(el&&el.tagName==='A')el.classList.add('active');if(name==='clients')renderClients();if(name==='bookings')loadBookings();if(name==='dashboard')loadDashboard();if(name==='slots')initSlotWeek();if(name==='staffmanage')loadStaffManage();if(name==='sessionreports')initSessionReportsPage();if(name==='dependency')initDependencyPage();}
+function showPage(name,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');if(el&&el.tagName==='A')el.classList.add('active');if(name==='clients')renderClients();if(name==='bookings')loadBookings();if(name==='dashboard')loadDashboard();if(name==='slots')initSlotWeek();if(name==='staffmanage')loadStaffManage();if(name==='sessionreports')initSessionReportsPage();}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
@@ -708,7 +685,63 @@ async function saveTicket(){
   if(error){showToast('保存に失敗しました');return;}
   closeModal('modal-ticket');showToast('チケットを保存しました');await loadCustomers();
 }
-function setBookingView(view){currentBookingView=view;document.getElementById('booking-calendar-view').style.display=view==='calendar'?'':'none';document.getElementById('booking-list-view').style.display=view==='list'?'':'none';document.getElementById('view-calendar-btn').style.background=view==='calendar'?'#f0fdf4':'';document.getElementById('view-list-btn').style.background=view==='list'?'#f0fdf4':'';if(view==='calendar')renderWeekCalendar();else loadBookingList();}
+function setBookingView(view){currentBookingView=view;document.getElementById('booking-calendar-view').style.display=view==='calendar'?'':'none';document.getElementById('booking-list-view').style.display=view==='list'?'':'none';document.getElementById('booking-activity-view').style.display=view==='activity'?'':'none';document.getElementById('view-calendar-btn').style.background=view==='calendar'?'#f0fdf4':'';document.getElementById('view-list-btn').style.background=view==='list'?'#f0fdf4':'';document.getElementById('view-activity-btn').style.background=view==='activity'?'#f0fdf4':'';if(view==='calendar')renderWeekCalendar();else if(view==='list')loadBookingList();else loadActivityLog();}
+async function loadActivityLog(){
+  const el=document.getElementById('activity-log-list');
+  el.innerHTML='<div class="loading">読み込み中...</div>';
+  const[{data:created,error:e1},{data:cancelled,error:e2}]=await Promise.all([
+    sbClient.from('bookings').select('*, customers(name), menus(name,ticket_cost)').order('created_at',{ascending:false}).limit(40),
+    sbClient.from('bookings').select('*, customers(name), menus(name,ticket_cost)').not('cancelled_at','is',null).order('cancelled_at',{ascending:false}).limit(40)
+  ]);
+  if(e1||e2){el.innerHTML='<div class="loading">読み込みに失敗しました</div>';return;}
+  const dn=['日','月','火','水','木','金','土'];
+  const fmt=dt=>{const d=new Date(dt);return `${d.getMonth()+1}/${d.getDate()}（${dn[d.getDay()]}）${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;};
+  const events=[];
+  for(const b of (created||[])){
+    events.push({
+      time: b.created_at,
+      customerName: b.customers?.name||'—',
+      badge: '<span class="badge badge-green">予約</span>',
+      detail: `${b.menus?.name||b.menu_name||'—'}　${fmt(b.scheduled_at)}〜`
+    });
+  }
+  for(const b of (cancelled||[])){
+    const scheduled=new Date(b.scheduled_at);
+    const cancelledAt=new Date(b.cancelled_at);
+    const diffH=(scheduled-cancelledAt)/(1000*60*60);
+    const isTicketMenu=(b.menus?.ticket_cost||0)>0;
+    let cancelBadge, cancelNote;
+    if(!isTicketMenu){
+      cancelBadge='<span class="badge badge-gray">キャンセル</span>';
+      cancelNote='';
+    } else if(diffH>=2){
+      cancelBadge='<span class="badge badge-gray">キャンセル（期限内）</span>';
+      cancelNote='チケット消化なし';
+    } else if(b.late_cancel_forgiven){
+      cancelBadge='<span class="badge badge-amber">キャンセル（直前・猶予適用）</span>';
+      cancelNote='月の無条件キャンセル猶予を使用／チケット消化なし';
+    } else {
+      cancelBadge='<span class="badge badge-red">キャンセル（直前）</span>';
+      cancelNote='チケット1回消化';
+    }
+    events.push({
+      time: b.cancelled_at,
+      customerName: b.customers?.name||'—',
+      badge: cancelBadge,
+      detail: `${b.menus?.name||b.menu_name||'—'}　${fmt(b.scheduled_at)}〜の予約を ${fmt(b.cancelled_at)} にキャンセル${cancelNote?'（'+cancelNote+'）':''}`
+    });
+  }
+  events.sort((a,b)=>new Date(b.time)-new Date(a.time));
+  const top=events.slice(0,50);
+  if(!top.length){el.innerHTML='<div class="loading">アクティビティがありません</div>';return;}
+  let html='<table><thead><tr><th>日時</th><th>会員</th><th>種別</th><th>内容</th></tr></thead><tbody>';
+  for(const ev of top){
+    const[bg,fg]=getAvatarColor(ev.customerName);
+    html+=`<tr><td style="font-weight:600;white-space:nowrap;">${fmt(ev.time)}</td><td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};font-size:10px;">${getInitials(ev.customerName)}</div>${ev.customerName}</div></td><td>${ev.badge}</td><td style="font-size:12px;color:#555;">${ev.detail}</td></tr>`;
+  }
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
 function getWeekStart(date){const d=new Date(date);d.setDate(d.getDate()-d.getDay());d.setHours(0,0,0,0);return d;}
 function changeWeek(dir){currentWeekStart.setDate(currentWeekStart.getDate()+dir*7);renderWeekCalendar();}
 async function renderWeekCalendar(){if(!sbClient)return;if(!currentWeekStart)currentWeekStart=getWeekStart(new Date());const weekEnd=new Date(currentWeekStart);weekEnd.setDate(weekEnd.getDate()+6);weekEnd.setHours(23,59,59,999);const mn=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];document.getElementById('week-label').textContent=`${currentWeekStart.getFullYear()}年${mn[currentWeekStart.getMonth()]}${currentWeekStart.getDate()}日 〜 ${mn[weekEnd.getMonth()]}${weekEnd.getDate()}日`;const{data:bookings}=await sbClient.from('bookings').select('*, customers(name), menus(name,ticket_cost)').gte('scheduled_at',toLocalDateStr(currentWeekStart)+'T00:00:00').lte('scheduled_at',toLocalDateStr(weekEnd)+'T23:59:59').eq('status','confirmed').order('scheduled_at',{ascending:true});const dn=['日','月','火','水','木','金','土'];const days=[];for(let i=0;i<7;i++){const d=new Date(currentWeekStart);d.setDate(d.getDate()+i);days.push(d);}const today=new Date();today.setHours(0,0,0,0);let html='<div style="display:grid;grid-template-columns:56px repeat(7,1fr);border-bottom:2px solid #e8e8e8;"><div></div>';for(const d of days){const isToday=d.getTime()===today.getTime();const col=d.getDay()===0?'#e06060':d.getDay()===6?'#6090e0':'#333';html+=`<div style="padding:8px 4px;text-align:center;${isToday?'background:#f0fdf4;':''}"><div style="font-size:11px;color:${col};font-weight:600;">${dn[d.getDay()]}</div><div style="font-size:16px;font-weight:${isToday?'700':'500'};color:${isToday?'#06C755':col};">${d.getDate()}</div></div>`;}html+='</div><div style="display:grid;grid-template-columns:56px repeat(7,1fr);">';for(const slot of TIME_SLOTS){const[h]=slot.split(':');html+=`<div style="padding:6px 4px;font-size:11px;color:#aaa;text-align:right;border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;display:flex;align-items:flex-start;justify-content:flex-end;">${slot}</div>`;for(const d of days){const isToday=d.getTime()===today.getTime();const dayB=(bookings||[]).filter(b=>{const bd=new Date(b.scheduled_at);return bd.getFullYear()===d.getFullYear()&&bd.getMonth()===d.getMonth()&&bd.getDate()===d.getDate()&&bd.getHours()===parseInt(h);});let cellHtml='';for(const b of dayB){const tc=b.menus?.ticket_cost;const mk=tc>0?'A':b.menus?.name?.includes('体験')?'B':'C';const mc=MENU_COLORS[mk]||MENU_COLORS['A'];cellHtml+=`<div style="background:${mc.bg};border:1px solid ${mc.border};border-radius:6px;padding:2px 6px;font-size:11px;color:${mc.color};margin-bottom:2px;cursor:pointer;" onclick="showBookingDetail('${b.id}','${(b.customers?.name||'').replace(/'/g,'`')}','${b.menus?.name||''}','${b.scheduled_at}')"><span style="font-weight:600;">${b.customers?.name?.slice(0,4)||'—'}</span></div>`;}html+=`<div style="border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;padding:2px;${isToday?'background:#fafffe;':''}">${cellHtml}</div>`;}}html+='</div>';document.getElementById('week-grid').innerHTML=html;}
@@ -720,16 +753,16 @@ async function cancelBooking(id){
   if(!confirm('この予約をキャンセルしますか？'))return;
   const{data:booking}=await sbClient.from('bookings').select('*, gcal_event_id').eq('id',id).single();
   if(booking?.gcal_event_id){fetch('https://script.google.com/macros/s/AKfycbzBBEQ_e91nn_1nuTaIS2XTs7_Qys36LcipJzSXtkt-mM6WS8UBhNl6IeLNxLHQOdjeuw/exec',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'delete',eventId:booking.gcal_event_id})}).catch(e=>console.log('GCal delete error:',e));}
-  const{error}=await sbClient.from('bookings').update({status:'cancelled'}).eq('id',id);
+  const{error}=await sbClient.from('bookings').update({status:'cancelled', cancelled_at: new Date().toISOString()}).eq('id',id);
   if(error){showToast('キャンセルに失敗しました');return;}
   showToast('予約をキャンセルしました');
-  if(currentBookingView==='calendar')await renderWeekCalendar();else await loadBookingList();
+  if(currentBookingView==='calendar')await renderWeekCalendar();else if(currentBookingView==='list')await loadBookingList();else await loadActivityLog();
 }
 async function cancelBookingFromPanel(bookingId,customerId){
   if(!confirm('この予約をキャンセルしますか？'))return;
   const{data:booking}=await sbClient.from('bookings').select('*, menus(ticket_cost), gcal_event_id').eq('id',bookingId).single();
   if(booking?.gcal_event_id){fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'delete',eventId:booking.gcal_event_id})}).catch(e=>console.log('GCal delete error:',e));}
-  const{error}=await sbClient.from('bookings').update({status:'cancelled'}).eq('id',bookingId);
+  const{error}=await sbClient.from('bookings').update({status:'cancelled', cancelled_at: new Date().toISOString()}).eq('id',bookingId);
   if(error){showToast('キャンセルに失敗しました');return;}
   showToast('予約をキャンセルしました');await loadCustomers();
   const spEl=document.getElementById('sp-panel-'+customerId);if(spEl&&spEl.style.display!=='none')spEl.innerHTML=await buildPanelHTML(customerId);
@@ -897,6 +930,8 @@ async function executeBlankSlots(){
   const res=getBlankSlotDates();
   if(!res){showToast('開始日と終了日を入力してください');return;}
   if(!confirm(`${res.start} 〜 ${res.end}（${res.dates.length}日分）を白紙（受付枠なし・休業表記はしない）にします。よろしいですか？`))return;
+  // ★ upsert/onConflictは date に一意制約が無いと重複行を作ってしまうことがあるため、
+  //    既存行と新規行を分けてupdate/insertする（1日=1行を保証する）
   const{data:existingRows,error:selErr}=await sbClient.from('slot_settings').select('date').gte('date',res.start).lte('date',res.end);
   if(selErr){showToast('確認に失敗しました: '+selErr.message);return;}
   const existingDates=new Set((existingRows||[]).map(r=>r.date));
@@ -1226,94 +1261,6 @@ function exportSessionReportCSV(){
   const a=document.createElement('a');
   a.href=url;a.download=`session_report_${month}.csv`;a.click();
   URL.revokeObjectURL(url);
-}
-/* ===================== 依存度モニタリング ===================== */
-async function initDependencyPage(){
-  if(!sbClient)return;
-  await ensureStaffLoaded();
-  const sel=document.getElementById('dep-target-staff');
-  if(sel.options.length===0||sel.dataset.loaded!=='1'){
-    sel.innerHTML=allStaff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-    sel.dataset.loaded='1';
-  }
-  await loadDependencyReport();
-}
-function getMonthKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
-function getMonthLabelJP(monthKey){const[y,m]=monthKey.split('-');return `${y}年${parseInt(m)}月`;}
-async function loadDependencyReport(){
-  if(!sbClient)return;
-  await ensureStaffLoaded();
-  const targetStaffId=document.getElementById('dep-target-staff').value;
-  const range=parseInt(document.getElementById('dep-month-range').value)||6;
-  if(!targetStaffId){showToast('対象スタッフを選択してください');return;}
-  const summaryEl=document.getElementById('dependency-summary');
-  const detailEl=document.getElementById('dependency-detail');
-  summaryEl.innerHTML='<div class="loading">集計中...</div>';
-  detailEl.innerHTML='<div class="loading">集計中...</div>';
-  const now=new Date();
-  const months=[];
-  for(let i=range-1;i>=0;i--){
-    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    months.push(getMonthKey(d));
-  }
-  const rangeStart=`${months[0]}-01`;
-  const lastMonth=months[months.length-1];
-  const[ly,lm]=lastMonth.split('-').map(Number);
-  const rangeEnd=new Date(Date.UTC(ly,lm,0)).toISOString().slice(0,10);
-  const{data:rateData}=await sbClient.from('staff_rates').select('*');
-  allStaffRates=rateData||[];
-  const{data:reports,error}=await sbClient.from('session_reports').select('*').gte('report_date',rangeStart).lte('report_date',rangeEnd);
-  if(error){summaryEl.innerHTML='<div class="loading">集計に失敗しました</div>';detailEl.innerHTML='';return;}
-  const byMonth={};
-  for(const mk of months)byMonth[mk]={};
-  for(const r of(reports||[])){
-    const mk=r.report_date.slice(0,7);
-    if(!byMonth[mk])continue;
-    if(!byMonth[mk][r.staff_id])byMonth[mk][r.staff_id]={count:0,amount:0};
-    byMonth[mk][r.staff_id].count+=1;
-    byMonth[mk][r.staff_id].amount+=getRate(r.staff_id,r.category);
-  }
-  const targetName=(allStaff.find(s=>s.id===targetStaffId)||{}).name||'選択スタッフ';
-  let sHtml='<table><thead><tr><th>対象月</th><th>全体件数</th><th>'+targetName+'の件数</th><th>シェア</th></tr></thead><tbody>';
-  for(const mk of months){
-    const monthData=byMonth[mk]||{};
-    const totalCount=Object.values(monthData).reduce((a,v)=>a+v.count,0);
-    const targetCount=(monthData[targetStaffId]||{count:0}).count;
-    const pct=totalCount>0?Math.round((targetCount/totalCount)*100):0;
-    const barClass=pct>=60?'bar-red':pct>=40?'bar-amber':'bar-green';
-    sHtml+=`<tr><td style="font-weight:600;">${getMonthLabelJP(mk)}</td><td>${totalCount}</td><td>${targetCount}</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${barClass}" style="width:${pct}%"></div></div><div class="bar-text">${pct}%</div></div></td></tr>`;
-  }
-  sHtml+='</tbody></table>';
-  const firstMonthData=byMonth[months[0]]||{};
-  const firstTotal=Object.values(firstMonthData).reduce((a,v)=>a+v.count,0);
-  const firstTarget=(firstMonthData[targetStaffId]||{count:0}).count;
-  const firstPct=firstTotal>0?Math.round((firstTarget/firstTotal)*100):0;
-  const lastMonthData=byMonth[months[months.length-1]]||{};
-  const lastTotal=Object.values(lastMonthData).reduce((a,v)=>a+v.count,0);
-  const lastTarget=(lastMonthData[targetStaffId]||{count:0}).count;
-  const lastPct=lastTotal>0?Math.round((lastTarget/lastTotal)*100):0;
-  const diff=lastPct-firstPct;
-  const diffLabel=diff===0?'横ばい':(diff>0?`+${diff}pt（上昇）`:`${diff}pt（低下）`);
-  const diffColor=diff>0?'#c0392b':diff<0?'#0a7a4a':'#888';
-  sHtml=`<div style="margin-bottom:14px;padding:12px 16px;background:#f8f8f8;border-radius:10px;font-size:13px;">${getMonthLabelJP(months[0])} → ${getMonthLabelJP(months[months.length-1])}：<strong style="color:${diffColor};">${diffLabel}</strong></div>`+sHtml;
-  summaryEl.innerHTML=sHtml;
-  let dHtml='<table><thead><tr><th>対象月</th>';
-  for(const s of allStaff)dHtml+=`<th>${s.name}</th>`;
-  dHtml+='<th>合計</th></tr></thead><tbody>';
-  for(const mk of months){
-    const monthData=byMonth[mk]||{};
-    let rowTotal=0;
-    dHtml+=`<tr><td style="font-weight:600;">${getMonthLabelJP(mk)}</td>`;
-    for(const s of allStaff){
-      const cnt=(monthData[s.id]||{count:0}).count;
-      rowTotal+=cnt;
-      const isTarget=s.id===targetStaffId;
-      dHtml+=`<td style="${isTarget?'font-weight:700;color:#1a56a0;':''}">${cnt}</td>`;
-    }
-    dHtml+=`<td style="font-weight:700;">${rowTotal}</td></tr>`;
-  }
-  dHtml+='</tbody></table>';
-  detailEl.innerHTML=dHtml;
 }
 window.addEventListener('DOMContentLoaded',async ()=>{
   const FIXED_URL='https://plapbyvgthymszrzbsgl.supabase.co';
