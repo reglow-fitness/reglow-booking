@@ -287,6 +287,7 @@
       <div class="card">
         <strong style="font-size:14px;display:block;margin-bottom:12px;">スタッフ追加</strong>
         <div class="form-row"><label class="form-label">名前</label><input class="form-input" id="staff-new-name" placeholder="山田太郎"></div>
+        <div class="form-row"><label class="form-label">ニックネーム（お客様側の表示名）</label><input class="form-input" id="staff-new-nickname" placeholder="やまだ　※未入力なら本名を表示"></div>
         <div class="form-row"><label class="form-label">PINコード（4桁）</label><input class="form-input" id="staff-new-pin" placeholder="1234" maxlength="4"></div>
         <button class="btn btn-primary" onclick="addStaff()">追加する</button>
       </div>
@@ -766,11 +767,11 @@ async function loadWeeklyDay(day,el){if(!sbClient)initSupabase();if(!sbClient){s
   document.getElementById('weekly-taiken-per-slot').innerHTML=thtml;
   // ★ 担当スタッフUI（時間帯ごと・名前で保存）
   const staffPerSlot=data?.staff_per_slot||{};
-  const activeStaffOptions=allStaff.filter(s=>s.is_active).map(s=>s.name);
+  const activeStaffOptions=allStaff.filter(s=>s.is_active).map(s=>({value:s.nickname||s.name, label:s.name}));
   let sthtml='';
   for(const slot of DEFAULT_SLOTS){
     const cur=staffPerSlot[slot]||'';
-    sthtml+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${slot}</span><select class="form-input weekly-staff-select" data-slot="${slot}" style="width:140px;"><option value="" ${cur===''?'selected':''}>未定</option>${activeStaffOptions.map(n=>`<option value="${n}" ${cur===n?'selected':''}>${n}</option>`).join('')}</select></div>`;
+    sthtml+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${slot}</span><select class="form-input weekly-staff-select" data-slot="${slot}" style="width:140px;"><option value="" ${cur===''?'selected':''}>未定</option>${activeStaffOptions.map(o=>`<option value="${o.value}" ${cur===o.value?'selected':''}>${o.label}</option>`).join('')}</select></div>`;
   }
   document.getElementById('weekly-staff-per-slot').innerHTML=sthtml;
   document.getElementById('weekly-editor').style.display='block';}
@@ -789,11 +790,11 @@ async function loadSlotSetting(){if(!sbClient)initSupabase();if(!sbClient){showT
   const dow2=new Date(date+'T00:00:00').getDay();
   const{data:weeklyForDate}=await sbClient.from('weekly_slot_settings').select('staff_per_slot').eq('day_of_week',dow2).single();
   const staffPerSlot2=data?.staff_per_slot||weeklyForDate?.staff_per_slot||{};
-  const activeStaffOptions2=allStaff.filter(s=>s.is_active).map(s=>s.name);
+  const activeStaffOptions2=allStaff.filter(s=>s.is_active).map(s=>({value:s.nickname||s.name, label:s.name}));
   let sthtml2='';
   for(const slot of DEFAULT_SLOTS){
     const cur=staffPerSlot2[slot]||'';
-    sthtml2+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${slot}</span><select class="form-input slot-staff-select" data-slot="${slot}" style="width:140px;"><option value="" ${cur===''?'selected':''}>未定</option>${activeStaffOptions2.map(n=>`<option value="${n}" ${cur===n?'selected':''}>${n}</option>`).join('')}</select></div>`;
+    sthtml2+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${slot}</span><select class="form-input slot-staff-select" data-slot="${slot}" style="width:140px;"><option value="" ${cur===''?'selected':''}>未定</option>${activeStaffOptions2.map(o=>`<option value="${o.value}" ${cur===o.value?'selected':''}>${o.label}</option>`).join('')}</select></div>`;
   }
   document.getElementById('slot-staff-per-slot').innerHTML=sthtml2;
   await loadSlotList();}
@@ -960,10 +961,11 @@ function renderStaffList(){
           <strong style="font-size:14px;">${s.name}</strong>
           ${s.is_active?'<span class="badge badge-green" style="margin-left:6px;">稼働中</span>':'<span class="badge" style="margin-left:6px;background:#f0f0f0;color:#888;">停止中</span>'}
           ${hasOwnRate?'<span class="badge badge-amber" style="margin-left:6px;">個別単価あり</span>':''}
-          <div style="font-size:12px;color:#888;margin-top:3px;">PIN: ${s.pin_code||'未設定'}</div>
+          <div style="font-size:12px;color:#888;margin-top:3px;">PIN: ${s.pin_code||'未設定'}　／　ニックネーム: ${s.nickname||'未設定（本名表示）'}</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn btn-sm" onclick="toggleStaffRateEditor('${s.id}')">単価設定</button>
+          <button class="btn btn-sm" onclick="editStaffNickname('${s.id}','${s.name.replace(/'/g,"\\'")}','${(s.nickname||'').replace(/'/g,"\\'")}')">ニックネーム変更</button>
           <button class="btn btn-sm" onclick="editStaffPin('${s.id}','${s.name.replace(/'/g,"\\'")}')">PIN変更</button>
           <button class="btn btn-sm" onclick="toggleStaffActive('${s.id}',${s.is_active})">${s.is_active?'停止':'再開'}</button>
           <button class="btn btn-sm btn-danger" onclick="deleteStaff('${s.id}','${s.name.replace(/'/g,"\\'")}')">削除</button>
@@ -988,14 +990,24 @@ function toggleStaffRateEditor(staffId){
 }
 async function addStaff(){
   const name=document.getElementById('staff-new-name').value.trim();
+  const nickname=document.getElementById('staff-new-nickname').value.trim();
   const pin=document.getElementById('staff-new-pin').value.trim();
   if(!name){showToast('名前を入力してください');return;}
   if(pin&&!/^\d{4}$/.test(pin)){showToast('PINは4桁の数字で入力してください');return;}
-  const{error}=await sbClient.from('staff').insert({name,pin_code:pin||null,is_active:true});
+  const{error}=await sbClient.from('staff').insert({name,nickname:nickname||null,pin_code:pin||null,is_active:true});
   if(error){showToast('追加に失敗しました');return;}
   document.getElementById('staff-new-name').value='';
+  document.getElementById('staff-new-nickname').value='';
   document.getElementById('staff-new-pin').value='';
   showToast(`${name} さんを追加しました`);
+  await loadStaffManage();
+}
+async function editStaffNickname(id,name,currentNickname){
+  const nickname=prompt(`${name} さんのニックネーム（お客様側の表示名）を入力してください\n空欄にすると本名が表示されます`, currentNickname||'');
+  if(nickname===null)return;
+  const{error}=await sbClient.from('staff').update({nickname:nickname.trim()||null}).eq('id',id);
+  if(error){showToast('更新に失敗しました');return;}
+  showToast('ニックネームを更新しました');
   await loadStaffManage();
 }
 async function editStaffPin(id,name){
