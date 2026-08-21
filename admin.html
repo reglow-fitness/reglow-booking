@@ -198,6 +198,7 @@
         <div class="tab" onclick="setClientTab('unlimited',this)">プレミアム</div>
         <div class="tab" onclick="setClientTab('coupon',this)">回数券</div>
         <div class="tab" onclick="setClientTab('low',this)">残数少ない</div>
+        <div class="tab" onclick="setClientTab('mismatch',this)">名前相違</div>
       </div>
       <div class="card pc-only" style="padding:0;"><div id="client-list-pc"><div class="loading">読み込み中...</div></div></div>
       <div class="sp-only" id="client-list-sp"><div class="loading">読み込み中...</div></div>
@@ -530,6 +531,15 @@ async function loadCustomers(){if(!sbClient)return;const{data,error}=await sbCli
 const avatarColors=[['#fff0e6','#c05000'],['#e6f9ef','#0a7a4a'],['#eeeeff','#4040cc'],['#fff0f6','#c0005a'],['#e8f1fc','#1a56a0'],['#fffbe6','#9a6800']];
 function getAvatarColor(name){return avatarColors[(name.charCodeAt(0)||0)%avatarColors.length];}
 function getInitials(name){return name?name.slice(0,2):'??';}
+// ★ LINEのプロフィール画像があればそれを、なければ従来のイニシャル円を表示（同名会員の見分け用）
+function renderAvatar(c,size){
+  size=size||30;
+  if(c.line_picture_url){
+    return `<img src="${c.line_picture_url}" alt="" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;">`;
+  }
+  const[bg,fg]=getAvatarColor(c.name);
+  return `<div class="avatar" style="background:${bg};color:${fg};width:${size}px;height:${size}px;font-size:${Math.round(size*0.37)}px;">${getInitials(c.name)}</div>`;
+}
 // ★ プランバッジクラス（coupon追加）
 function getPlanBadgeClass(planType){
   if(planType==='unlimited')return 'badge-green';
@@ -542,6 +552,7 @@ function renderClients(){
   let list=allClients.filter(c=>c.name.toLowerCase().includes(search));
   if(PLAN_TYPES.includes(currentClientTab)&&currentClientTab!=='all')list=list.filter(c=>c.tickets?.some(t=>t.plan_type===currentClientTab));
   if(currentClientTab==='low')list=list.filter(c=>c.tickets?.some(t=>t.plan_type!=='unlimited'&&!isCoupon(t.plan_type)&&t.remaining_count<=5));
+  if(currentClientTab==='mismatch')list=list.filter(c=>c.line_display_name&&c.line_display_name!==c.name);
   renderClientsPC(list);renderClientsSP(list);
 }
 function getTicketDisplay(ticket){
@@ -564,13 +575,16 @@ function renderClientsPC(list){
     const activeTicket=c.tickets?.find(t=>(!t.valid_from||t.valid_from<=todayStr)&&(!t.expires_at||t.expires_at>=todayStr));
     const futureTicket=c.tickets?.filter(t=>t.valid_from>todayStr).sort((a,b)=>a.valid_from.localeCompare(b.valid_from))[0];
     const ticket=activeTicket||futureTicket||c.tickets?.[c.tickets.length-1];
-    const[bg,fg]=getAvatarColor(c.name);
     const planBadge=ticket?`<span class="badge ${getPlanBadgeClass(ticket.plan_type)}">${PLAN_NAMES[ticket.plan_type]||ticket.plan_type}</span>`:'<span class="badge badge-gray">未設定</span>';
     const periodStart=ticket?.valid_from||null;const periodEnd=ticket?.expires_at?.slice(0,10)||null;
     const expiry=periodStart?`${periodStart} 〜 ${periodEnd||'未設定'}`:(periodEnd||'—');
     const isBlocked=c.is_blocked||false;
+    const nameMismatch = c.line_display_name && c.line_display_name !== c.name;
+    const nameMismatchNote = nameMismatch
+      ? `<div style="font-size:11px;color:#9a6800;margin-top:2px;">⚠️ LINE表示名: ${c.line_display_name}</div>`
+      : '';
     html+=`<tr class="row-clickable" onclick="toggleTicketPanel('${c.id}',this)" style="${isBlocked?'opacity:0.6;':''}">
-      <td><div class="name-cell"><div class="avatar" style="background:${bg};color:${fg};">${getInitials(c.name)}</div>${c.name}${isBlocked?' <span class="badge badge-red">ブロック中</span>':''}</div></td>
+      <td><div class="name-cell">${renderAvatar(c,30)}<div>${c.name}${isBlocked?' <span class="badge badge-red">ブロック中</span>':''}${nameMismatch?' <span class="badge badge-amber">名前相違</span>':''}${nameMismatchNote}</div></div></td>
       <td>${planBadge}</td>
       <td>${getTicketDisplay(ticket)}</td>
       <td style="font-size:12px;color:#888;">${expiry}</td>
@@ -595,8 +609,8 @@ function renderClientsSP(list){
     const activeTicket=c.tickets?.find(t=>(!t.valid_from||t.valid_from<=todayStr)&&(!t.expires_at||t.expires_at>=todayStr));
     const futureTicket=c.tickets?.filter(t=>t.valid_from&&t.valid_from>todayStr).sort((a,b)=>a.valid_from.localeCompare(b.valid_from))[0];
     const ticket=activeTicket||futureTicket||c.tickets?.[c.tickets.length-1];
-    const[bg,fg]=getAvatarColor(c.name);
     const isBlocked=c.is_blocked||false;
+    const nameMismatchSP = c.line_display_name && c.line_display_name !== c.name;
     const planName=ticket?PLAN_NAMES[ticket.plan_type]:'未設定';
     const remainCount=ticket?.plan_type==='unlimited'?'∞':(ticket?.remaining_count??'—');
     const expiry=ticket?.valid_from?`${ticket.valid_from} 〜 ${ticket.expires_at||'未設定'}`:'—';
@@ -604,9 +618,10 @@ function renderClientsSP(list){
     const barColor=pct>50?'#06C755':pct>20?'#f0a500':'#e74c3c';
     html+=`<div class="client-card" style="${isBlocked?'opacity:0.7;':''}">
       <div class="client-card-header" onclick="toggleCardSP('${c.id}')">
-        <div class="avatar" style="background:${bg};color:${fg};width:40px;height:40px;font-size:13px;">${getInitials(c.name)}</div>
+        ${renderAvatar(c,40)}
         <div style="flex:1;">
-          <div style="font-size:15px;font-weight:600;">${c.name}${isBlocked?' <span class="badge badge-red" style="font-size:10px;vertical-align:middle;">ブロック中</span>':''}</div>
+          <div style="font-size:15px;font-weight:600;">${c.name}${isBlocked?' <span class="badge badge-red" style="font-size:10px;vertical-align:middle;">ブロック中</span>':''}${nameMismatchSP?' <span class="badge badge-amber" style="font-size:10px;vertical-align:middle;">名前相違</span>':''}</div>
+          ${nameMismatchSP?`<div style="font-size:11px;color:#9a6800;">⚠️ LINE表示名: ${c.line_display_name}</div>`:''}
           <span class="badge ${getPlanBadgeClass(ticket?.plan_type||'')||'badge-gray'}" style="font-size:10px;margin-top:3px;display:inline-block;">${planName}</span>
         </div>
         <div style="text-align:right;margin-right:6px;">
