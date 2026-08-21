@@ -274,6 +274,12 @@ async function loadCustomer() {
   const { data } = await sbClient.from('customers').select('*, tickets(*)').eq('line_user_id', lineProfile.userId);
   if (data && data.length > 0) {
     currentCustomer = data[0];
+    // ★ LINEの表示名を毎回最新化（管理画面で「登録名とLINE表示名が一致しているか」を確認できるようにするため）
+    if (currentCustomer.line_display_name !== lineProfile.displayName || currentCustomer.line_picture_url !== lineProfile.pictureUrl) {
+      await sbClient.from('customers').update({ line_display_name: lineProfile.displayName, line_picture_url: lineProfile.pictureUrl || null }).eq('id', currentCustomer.id);
+      currentCustomer.line_display_name = lineProfile.displayName;
+      currentCustomer.line_picture_url = lineProfile.pictureUrl || null;
+    }
     const todayStr = new Date().toISOString().slice(0,10);
     const activeTicket = currentCustomer.tickets?.find(t =>
       (t.plan_type === 'unlimited' || t.remaining_count > 0) &&
@@ -285,7 +291,7 @@ async function loadCustomer() {
     ).sort((a,b) => a.valid_from.localeCompare(b.valid_from))[0];
     currentTicket = activeTicket || futureTicket || currentCustomer.tickets?.[0] || null;
   } else {
-    const { data: newC } = await sbClient.from('customers').insert({ name: lineProfile.displayName, line_user_id: lineProfile.userId }).select('*, tickets(*)').single();
+    const { data: newC } = await sbClient.from('customers').insert({ name: lineProfile.displayName, line_user_id: lineProfile.userId, line_display_name: lineProfile.displayName, line_picture_url: lineProfile.pictureUrl || null }).select('*, tickets(*)').single();
     currentCustomer = newC;
     currentTicket = null;
   }
