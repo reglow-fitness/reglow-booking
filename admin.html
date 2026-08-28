@@ -154,6 +154,7 @@
       <a onclick="showPage('staffmanage',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="11" cy="6" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 14c0-2.5 1.8-4 4-4s4 1.5 4 4M9.5 14c0-2-1.2-3.3-2.5-3.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>スタッフ管理</a>
       <a onclick="showPage('sessionreports',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 13V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10l-3-2-3 2-3-2-3 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 5.5h6M5 8h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>セッション集計</a>
       <a onclick="showPage('dependency',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 2v10a1 1 0 0 0 1 1h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 11V7M8.5 11V4M12 11V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>依存度モニタリング</a>
+      <a onclick="showPage('tendency',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5v3.8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>予約傾向分析</a>
       <a class="active" onclick="showPage('settings',this)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>設定</a>
     </nav>
   </div>
@@ -361,6 +362,30 @@
         <div id="dependency-cross-table"></div>
       </div>
     </div>
+    <!-- 予約傾向分析 -->
+    <div class="page" id="page-tendency">
+      <div class="page-title">予約傾向分析</div>
+      <div class="card">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <label class="form-label" style="margin:0;">会員</label>
+          <select class="form-input" id="tendency-customer-select" style="width:auto;min-width:200px;"><option value="">会員を選択</option></select>
+          <button class="btn btn-primary" onclick="loadBookingTendency()">集計する</button>
+        </div>
+      </div>
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:4px;">担当スタッフ別（推定含む）</strong>
+        <p style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.6;">1人体制の時間帯は確実にカウントしています。2人体制の時間帯は指名制ではなくどちらが対応したか記録がないため、その時間にいたスタッフ全員に「推定」として加算しています（目安としてご覧ください）。</p>
+        <div id="tendency-staff-table"><div class="loading">会員を選んで「集計する」を押してください</div></div>
+      </div>
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:10px;">時間帯別（何時によく来るか）</strong>
+        <div id="tendency-time-table"></div>
+      </div>
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:10px;">曜日別（何曜日によく来るか）</strong>
+        <div id="tendency-dow-table"></div>
+      </div>
+    </div>
     <div class="page active" id="page-settings">
       <div class="page-title">設定</div>
       <div class="card">
@@ -431,6 +456,9 @@
   </button>
   <button class="bottom-nav-item" id="bn-dependency" onclick="showPage('dependency',null);setBottomNav('bn-dependency')">
     <svg viewBox="0 0 16 16" fill="none"><path d="M2 2v10a1 1 0 0 0 1 1h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 11V7M8.5 11V4M12 11V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>依存度
+  </button>
+  <button class="bottom-nav-item" id="bn-tendency" onclick="showPage('tendency',null);setBottomNav('bn-tendency')">
+    <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5v3.8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>予約傾向
   </button>
   <button class="bottom-nav-item" id="bn-settings" onclick="showPage('settings',null);setBottomNav('bn-settings')">
     <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>設定
@@ -521,7 +549,7 @@ function isCoupon(planType){return planType==='coupon';}
 function setBottomNav(id){document.querySelectorAll('.bottom-nav-item').forEach(e=>e.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');}
 function initSupabase(){const url=document.getElementById('setting-url').value.trim()||'https://plapbyvgthymszrzbsgl.supabase.co';const key=document.getElementById('setting-key').value.trim()||'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';if(url&&key){sbClient=window.supabase.createClient(url,key);return true;}return false;}
 function saveSettings(){const url=document.getElementById('setting-url').value.trim();const key=document.getElementById('setting-key').value.trim();if(!url||!key){showToast('URLとキーを入力してください');return;}sbClient=window.supabase.createClient(url,key);document.getElementById('setting-status').textContent='✅ 接続しました！';showToast('接続しました！');showPage('dashboard',null);setBottomNav('bn-dashboard');loadAll();}
-function showPage(name,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');if(el&&el.tagName==='A')el.classList.add('active');if(name==='clients')renderClients();if(name==='bookings')loadBookings();if(name==='dashboard')loadDashboard();if(name==='slots')initSlotWeek();if(name==='staffmanage')loadStaffManage();if(name==='sessionreports')initSessionReportsPage();if(name==='dependency')initDependencyPage();}
+function showPage(name,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');if(el&&el.tagName==='A')el.classList.add('active');if(name==='clients')renderClients();if(name==='bookings')loadBookings();if(name==='dashboard')loadDashboard();if(name==='slots')initSlotWeek();if(name==='staffmanage')loadStaffManage();if(name==='sessionreports')initSessionReportsPage();if(name==='dependency')initDependencyPage();if(name==='tendency')initTendencyPage();}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
@@ -1403,6 +1431,98 @@ async function loadDependencyMonitoring(){
   }
   crossHtml+='</tbody></table>';
   document.getElementById('dependency-cross-table').innerHTML=crossHtml;
+}
+/* ===================== 予約傾向分析（会員別） ===================== */
+async function initTendencyPage(){
+  if(!allClients.length) await loadCustomers();
+  const sel=document.getElementById('tendency-customer-select');
+  const prevValue=sel.value;
+  sel.innerHTML='<option value="">会員を選択</option>'+[...allClients].sort((a,b)=>a.name.localeCompare(b.name,'ja')).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  if(prevValue)sel.value=prevValue;
+}
+async function loadBookingTendency(){
+  const customerId=document.getElementById('tendency-customer-select').value;
+  if(!customerId){showToast('会員を選択してください');return;}
+  document.getElementById('tendency-staff-table').innerHTML='<div class="loading">集計中...</div>';
+  document.getElementById('tendency-time-table').innerHTML='';
+  document.getElementById('tendency-dow-table').innerHTML='';
+
+  const{data:bookings,error}=await sbClient.from('bookings').select('*, menus(name)').eq('customer_id',customerId).in('status',['confirmed','completed']).order('scheduled_at',{ascending:true});
+  if(error){document.getElementById('tendency-staff-table').innerHTML='<div class="loading">集計に失敗しました</div>';return;}
+  if(!bookings||!bookings.length){document.getElementById('tendency-staff-table').innerHTML='<div class="loading">この会員の予約履歴（確定・完了）がありません</div>';return;}
+
+  // 該当する日付分だけ日付指定設定を取得し、週間テンプレートと合わせて時間帯ごとの担当スタッフを引けるようにする
+  const dates=[...new Set(bookings.map(b=>b.scheduled_at.slice(0,10)))];
+  const[{data:slotRows},{data:weeklyRows}]=await Promise.all([
+    sbClient.from('slot_settings').select('date, staff_per_slot').in('date',dates),
+    sbClient.from('weekly_slot_settings').select('day_of_week, staff_per_slot')
+  ]);
+  const slotByDate={};for(const r of(slotRows||[]))slotByDate[r.date]=r.staff_per_slot||{};
+  const weeklyByDow={};for(const r of(weeklyRows||[]))weeklyByDow[r.day_of_week]=r.staff_per_slot||{};
+
+  const staffCounts={}; // name -> {certain, estimated}
+  const timeCounts={};  // "09:00" -> count
+  const dowCounts={0:0,1:0,2:0,3:0,4:0,5:0,6:0};
+
+  for(const b of bookings){
+    const dt=new Date(b.scheduled_at);
+    const dateStr=b.scheduled_at.slice(0,10);
+    const hh=String(dt.getHours()).padStart(2,'0')+':00';
+    const dow=dt.getDay();
+    timeCounts[hh]=(timeCounts[hh]||0)+1;
+    dowCounts[dow]=(dowCounts[dow]||0)+1;
+
+    const perSlot=slotByDate[dateStr]||weeklyByDow[dow]||{};
+    const raw=perSlot[hh];
+    const arr=Array.isArray(raw)?raw:(raw?[raw]:[]);
+    if(arr.length===0){
+      staffCounts['不明（記録なし）']=staffCounts['不明（記録なし）']||{certain:0,estimated:0};
+      staffCounts['不明（記録なし）'].certain++;
+    } else if(arr.length===1){
+      staffCounts[arr[0]]=staffCounts[arr[0]]||{certain:0,estimated:0};
+      staffCounts[arr[0]].certain++;
+    } else {
+      for(const name of arr){
+        staffCounts[name]=staffCounts[name]||{certain:0,estimated:0};
+        staffCounts[name].estimated++;
+      }
+    }
+  }
+
+  // 担当スタッフ別テーブル
+  const totalBookings=bookings.length;
+  const staffRows=Object.entries(staffCounts).sort((a,b)=>(b[1].certain+b[1].estimated)-(a[1].certain+a[1].estimated));
+  let staffHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">対象予約件数（確定・完了）：${totalBookings}件</p><table><thead><tr><th>スタッフ</th><th>確実な回数</th><th>推定（2人体制時）</th><th>目安の割合</th></tr></thead><tbody>`;
+  for(const[name,c]of staffRows){
+    const sum=c.certain+c.estimated;
+    const pct=totalBookings>0?Math.round((sum/totalBookings)*1000)/10:0;
+    staffHtml+=`<tr><td style="font-weight:600;">${name}</td><td>${c.certain}</td><td>${c.estimated>0?c.estimated:'—'}</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill bar-green" style="width:${pct}%"></div></div><div class="bar-text">${pct}%</div></div></td></tr>`;
+  }
+  staffHtml+='</tbody></table>';
+  document.getElementById('tendency-staff-table').innerHTML=staffHtml;
+
+  // 時間帯別テーブル
+  let timeHtml='<table><thead><tr><th>時間帯</th><th>回数</th><th></th></tr></thead><tbody>';
+  const maxTimeCount=Math.max(1,...Object.values(timeCounts));
+  for(const slot of DEFAULT_SLOTS){
+    const cnt=timeCounts[slot]||0;
+    if(cnt===0)continue;
+    const pct=Math.round((cnt/maxTimeCount)*100);
+    timeHtml+=`<tr><td style="font-weight:600;">${slot}</td><td>${cnt}</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill bar-green" style="width:${pct}%"></div></div></div></td></tr>`;
+  }
+  timeHtml+='</tbody></table>';
+  document.getElementById('tendency-time-table').innerHTML=timeHtml;
+
+  // 曜日別テーブル
+  let dowHtml='<table><thead><tr><th>曜日</th><th>回数</th><th></th></tr></thead><tbody>';
+  const maxDowCount=Math.max(1,...Object.values(dowCounts));
+  for(let d=0;d<7;d++){
+    const cnt=dowCounts[d]||0;
+    const pct=Math.round((cnt/maxDowCount)*100);
+    dowHtml+=`<tr><td style="font-weight:600;">${DAY_NAMES[d]}曜日</td><td>${cnt}</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill bar-green" style="width:${pct}%"></div></div></div></td></tr>`;
+  }
+  dowHtml+='</tbody></table>';
+  document.getElementById('tendency-dow-table').innerHTML=dowHtml;
 }
 window.addEventListener('DOMContentLoaded',async ()=>{
   const FIXED_URL='https://plapbyvgthymszrzbsgl.supabase.co';
