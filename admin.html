@@ -1500,25 +1500,47 @@ async function loadBookingTendency(){
   staffHtml+='</tbody></table>';
   document.getElementById('tendency-staff-table').innerHTML=staffHtml;
 
-  // 時間帯別テーブル
-  let timeHtml='<table><thead><tr><th>時間帯</th><th>回数</th><th></th></tr></thead><tbody>';
-  const maxTimeCount=Math.max(1,...Object.values(timeCounts));
-  for(const slot of DEFAULT_SLOTS){
+  // 集計期間（データに含まれる最古〜最新の予約日）を算出し、「平均」の分母に使う
+  const bookingDates=bookings.map(b=>{const s=b.scheduled_at.slice(0,10);return new Date(s+'T00:00:00');});
+  const minDate=new Date(Math.min(...bookingDates));
+  const maxDate=new Date(Math.max(...bookingDates));
+  const totalDaysInRange=Math.round((maxDate-minDate)/(1000*60*60*24))+1;
+  const dowOccurrences=[0,0,0,0,0,0,0];
+  {
+    let d=new Date(minDate);
+    while(d<=maxDate){dowOccurrences[d.getDay()]++;d.setDate(d.getDate()+1);}
+  }
+  const periodLabel=`${toLocalDateStr(minDate)} 〜 ${toLocalDateStr(maxDate)}（${totalDaysInRange}日間）`;
+
+  // 時間帯別テーブル（平均＝その時間帯の合計予約数 ÷ 集計期間の日数。少ない順に並べ替え、シフト・店休日検討の目安に）
+  let timeHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">集計期間：${periodLabel}　／　平均は1日あたりの件数です。少ない順に並んでいます。</p><table><thead><tr><th>時間帯</th><th>合計回数</th><th>1日あたり平均</th><th></th></tr></thead><tbody>`;
+  const timeRows=DEFAULT_SLOTS.map(slot=>{
     const cnt=timeCounts[slot]||0;
-    if(cnt===0)continue;
-    const pct=Math.round((cnt/maxTimeCount)*100);
-    timeHtml+=`<tr><td style="font-weight:600;">${slot}</td><td>${cnt}</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill bar-green" style="width:${pct}%"></div></div></div></td></tr>`;
+    const avg=totalDaysInRange>0?Math.round((cnt/totalDaysInRange)*100)/100:0;
+    return{slot,cnt,avg};
+  }).sort((a,b)=>a.avg-b.avg);
+  const maxTimeAvg=Math.max(0.01,...timeRows.map(r=>r.avg));
+  for(const r of timeRows){
+    const pct=Math.round((r.avg/maxTimeAvg)*100);
+    const barClass=r.avg===0?'bar-red':pct<30?'bar-amber':'bar-green';
+    timeHtml+=`<tr><td style="font-weight:600;">${r.slot}</td><td>${r.cnt}</td><td>${r.avg}</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${barClass}" style="width:${pct}%"></div></div></div></td></tr>`;
   }
   timeHtml+='</tbody></table>';
   document.getElementById('tendency-time-table').innerHTML=timeHtml;
 
-  // 曜日別テーブル
-  let dowHtml='<table><thead><tr><th>曜日</th><th>回数</th><th></th></tr></thead><tbody>';
-  const maxDowCount=Math.max(1,...Object.values(dowCounts));
-  for(let d=0;d<7;d++){
+  // 曜日別テーブル（平均＝その曜日の合計予約数 ÷ 集計期間中その曜日が何回あったか。少ない順に並べ替え）
+  let dowHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">集計期間：${periodLabel}　／　平均はその曜日1回あたりの件数です。少ない順に並んでいます。</p><table><thead><tr><th>曜日</th><th>合計回数</th><th>1回あたり平均</th><th></th></tr></thead><tbody>`;
+  const dowRows=[0,1,2,3,4,5,6].map(d=>{
     const cnt=dowCounts[d]||0;
-    const pct=Math.round((cnt/maxDowCount)*100);
-    dowHtml+=`<tr><td style="font-weight:600;">${DAY_NAMES[d]}曜日</td><td>${cnt}</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill bar-green" style="width:${pct}%"></div></div></div></td></tr>`;
+    const occ=dowOccurrences[d]||0;
+    const avg=occ>0?Math.round((cnt/occ)*100)/100:0;
+    return{d,cnt,occ,avg};
+  }).sort((a,b)=>a.avg-b.avg);
+  const maxDowAvg=Math.max(0.01,...dowRows.map(r=>r.avg));
+  for(const r of dowRows){
+    const pct=Math.round((r.avg/maxDowAvg)*100);
+    const barClass=r.avg===0?'bar-red':pct<30?'bar-amber':'bar-green';
+    dowHtml+=`<tr><td style="font-weight:600;">${DAY_NAMES[r.d]}曜日</td><td>${r.cnt}</td><td>${r.avg}</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill ${barClass}" style="width:${pct}%"></div></div></div></td></tr>`;
   }
   dowHtml+='</tbody></table>';
   document.getElementById('tendency-dow-table').innerHTML=dowHtml;
