@@ -1437,19 +1437,22 @@ async function initTendencyPage(){
   if(!allClients.length) await loadCustomers();
   const sel=document.getElementById('tendency-customer-select');
   const prevValue=sel.value;
-  sel.innerHTML='<option value="">会員を選択</option>'+[...allClients].sort((a,b)=>a.name.localeCompare(b.name,'ja')).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  sel.innerHTML='<option value="">会員を選択</option><option value="__all__">👥 全会員（全体合計）</option>'+[...allClients].sort((a,b)=>a.name.localeCompare(b.name,'ja')).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   if(prevValue)sel.value=prevValue;
 }
 async function loadBookingTendency(){
   const customerId=document.getElementById('tendency-customer-select').value;
   if(!customerId){showToast('会員を選択してください');return;}
+  const isAll=customerId==='__all__';
   document.getElementById('tendency-staff-table').innerHTML='<div class="loading">集計中...</div>';
   document.getElementById('tendency-time-table').innerHTML='';
   document.getElementById('tendency-dow-table').innerHTML='';
 
-  const{data:bookings,error}=await sbClient.from('bookings').select('*, menus(name)').eq('customer_id',customerId).in('status',['confirmed','completed']).order('scheduled_at',{ascending:true});
+  let bookingQuery=sbClient.from('bookings').select('*, menus(name)').in('status',['confirmed','completed']).order('scheduled_at',{ascending:true});
+  if(!isAll)bookingQuery=bookingQuery.eq('customer_id',customerId);
+  const{data:bookings,error}=await bookingQuery;
   if(error){document.getElementById('tendency-staff-table').innerHTML='<div class="loading">集計に失敗しました</div>';return;}
-  if(!bookings||!bookings.length){document.getElementById('tendency-staff-table').innerHTML='<div class="loading">この会員の予約履歴（確定・完了）がありません</div>';return;}
+  if(!bookings||!bookings.length){document.getElementById('tendency-staff-table').innerHTML=`<div class="loading">${isAll?'予約履歴（確定・完了）がありません':'この会員の予約履歴（確定・完了）がありません'}</div>`;return;}
 
   // 該当する日付分だけ日付指定設定を取得し、週間テンプレートと合わせて時間帯ごとの担当スタッフを引けるようにする
   const dates=[...new Set(bookings.map(b=>b.scheduled_at.slice(0,10)))];
@@ -1492,7 +1495,7 @@ async function loadBookingTendency(){
   // 担当スタッフ別テーブル
   const totalBookings=bookings.length;
   const staffRows=Object.entries(staffCounts).sort((a,b)=>(b[1].certain+b[1].estimated)-(a[1].certain+a[1].estimated));
-  let staffHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">対象予約件数（確定・完了）：${totalBookings}件</p><table><thead><tr><th>スタッフ</th><th>確実な回数</th><th>推定（2人体制時）</th><th>目安の割合</th></tr></thead><tbody>`;
+  let staffHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">対象予約件数（確定・完了）：${totalBookings}件${isAll?'（全会員合計）':''}</p><table><thead><tr><th>スタッフ</th><th>確実な回数</th><th>推定（2人体制時）</th><th>目安の割合</th></tr></thead><tbody>`;
   for(const[name,c]of staffRows){
     const sum=c.certain+c.estimated;
     const pct=totalBookings>0?Math.round((sum/totalBookings)*1000)/10:0;
