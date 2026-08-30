@@ -679,7 +679,7 @@ async function toggleSPTicketPanel(customerId){const el=document.getElementById(
 async function buildPanelHTML(customerId){
   const[ticketRes,bookingRes]=await Promise.all([
     sbClient.from('tickets').select('*').eq('customer_id',customerId).order('valid_from',{ascending:true}),
-    sbClient.from('bookings').select('*, menus(name,ticket_cost)').eq('customer_id',customerId).in('status',['confirmed','completed','cancelled']).order('scheduled_at',{ascending:false}).limit(20)
+    sbClient.from('bookings').select('*, menus(name,ticket_cost)').eq('customer_id',customerId).in('status',['confirmed','completed','cancelled']).order('scheduled_at',{ascending:false}).limit(200)
   ]);
   const tickets=ticketRes.data||[];const bookings=bookingRes.data||[];
   const todayStr=new Date().toISOString().slice(0,10);const dn=['日','月','火','水','木','金','土'];
@@ -698,23 +698,56 @@ async function buildPanelHTML(customerId){
     tHtml+=`<div class="ticket-item"><span class="badge ${pc}">${PLAN_NAMES[t.plan_type]||t.plan_type}</span><span class="ticket-item-period">${period}</span><span class="ticket-item-count">${cnt}</span>${statusLabel}${dec}${inc}<button class="btn btn-sm btn-danger" onclick="deleteTicket('${t.id}','${customerId}')">削除</button></div>`;
   }}
   tHtml+='</div>';
-  let bHtml='<div class="booking-panel" style="margin-top:8px;"><div class="booking-panel-title">📅 予約履歴（直近20件）</div>';
-  if(!bookings.length){bHtml+='<div style="font-size:13px;color:#aaa;text-align:center;padding:8px;">予約がありません</div>';}
-  else{
+  // ★ 予約履歴は「直近20件」だと予約頻度の高い会員で古い月が丸ごと見えなくなるため、月ごとにグルーピング。
+  //    当月は展開表示、それより前の月は折りたたみ表示にする
+  let bHtml='<div class="booking-panel" style="margin-top:8px;"><div class="booking-panel-title">📅 予約履歴</div>';
+  if(!bookings.length){
+    bHtml+='<div style="font-size:13px;color:#aaa;text-align:center;padding:8px;">予約がありません</div>';
+  } else {
     const cc=bookings.filter(b=>b.status==='confirmed').length;
     if(cc>0)bHtml+=`<div style="margin-bottom:8px;"><span class="badge badge-green">確定中 ${cc}件</span></div>`;
-    for(const b of bookings){
+    const renderBookingRow=(b)=>{
       const dt=new Date(b.scheduled_at);
       const ds=`${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}（${dn[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
       const sm={confirmed:['確定','#e6f7ee','#0a7a4a'],completed:['完了','#e8f1fc','#1a56a0'],cancelled:['キャンセル','#ffeaea','#c0392b']};
       const[label,sbg,sc]=sm[b.status]||['—','#f0f0f0','#666'];
       const cb=b.status==='confirmed'?`<button class="btn btn-sm btn-danger" onclick="cancelBookingFromPanel('${b.id}','${customerId}')">キャンセル</button>`:'';
       const delBtn=`<button class="btn btn-sm btn-danger" onclick="deleteBookingRecord('${b.id}','${customerId}',${b.menus?.ticket_cost||0},'${b.ticket_id||''}')">削除</button>`;
-      bHtml+=`<div class="booking-item"><span class="booking-item-date">${ds}</span><span class="booking-item-menu">${b.menus?.name||b.menu_name||'—'}</span><span class="booking-item-status" style="background:${sbg};color:${sc};">${label}</span>${cb}${delBtn}</div>`;
+      return `<div class="booking-item"><span class="booking-item-date">${ds}</span><span class="booking-item-menu">${b.menus?.name||b.menu_name||'—'}</span><span class="booking-item-status" style="background:${sbg};color:${sc};">${label}</span>${cb}${delBtn}</div>`;
+    };
+    const now=new Date();
+    const currentMonthKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const byMonth={};
+    for(const b of bookings){
+      const mk=b.scheduled_at.slice(0,7);
+      (byMonth[mk]=byMonth[mk]||[]).push(b);
+    }
+    const monthKeys=Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));
+    for(const mk of monthKeys){
+      const[y,m]=mk.split('-');
+      const monthLabel=`${y}年${parseInt(m)}月`;
+      const items=byMonth[mk];
+      if(mk===currentMonthKey){
+        bHtml+=`<div style="font-size:12px;font-weight:600;color:#555;margin:10px 0 4px;">${monthLabel}（${items.length}件）</div>`;
+        for(const b of items)bHtml+=renderBookingRow(b);
+      } else {
+        const panelId=`booking-month-${customerId}-${mk}`;
+        bHtml+=`<div class="row-clickable" style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-top:1px solid #eef8f3;margin-top:6px;font-size:12px;font-weight:600;color:#555;" onclick="toggleBookingMonth('${panelId}')">
+          <span>${monthLabel}（${items.length}件）</span><span style="color:#aaa;">▼ 開く</span>
+        </div>
+        <div id="${panelId}" style="display:none;">`;
+        for(const b of items)bHtml+=renderBookingRow(b);
+        bHtml+='</div>';
+      }
     }
   }
   bHtml+='</div>';
   return tHtml+bHtml;
+}
+function toggleBookingMonth(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.style.display=el.style.display==='none'?'block':'none';
 }
 function filterClients(q){renderClients();}
 function setClientTab(tab,el){currentClientTab=tab;document.querySelectorAll('.tab-bar .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderClients();const bb=document.getElementById('bulk-ticket-btn');if(bb)bb.style.display=PLAN_TYPES.includes(tab)&&tab!=='coupon'?'':'';}
