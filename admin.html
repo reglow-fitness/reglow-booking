@@ -369,6 +369,8 @@
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <label class="form-label" style="margin:0;">会員</label>
           <select class="form-input" id="tendency-customer-select" style="width:auto;min-width:200px;"><option value="">会員を選択</option></select>
+          <label class="form-label" style="margin:0;">対象期間</label>
+          <select class="form-input" id="tendency-month-select" style="width:auto;"><option value="">全期間</option></select>
           <button class="btn btn-primary" onclick="loadBookingTendency()">集計する</button>
         </div>
       </div>
@@ -1472,20 +1474,41 @@ async function initTendencyPage(){
   const prevValue=sel.value;
   sel.innerHTML='<option value="">会員を選択</option><option value="__all__">👥 全会員（全体合計）</option>'+[...allClients].sort((a,b)=>a.name.localeCompare(b.name,'ja')).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   if(prevValue)sel.value=prevValue;
+  const monthSel=document.getElementById('tendency-month-select');
+  const prevMonth=monthSel.value;
+  const now=new Date();
+  let monthOptions='<option value="">全期間</option>';
+  for(let i=0;i<13;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    monthOptions+=`<option value="${key}">${d.getFullYear()}年${d.getMonth()+1}月</option>`;
+  }
+  monthSel.innerHTML=monthOptions;
+  if(prevMonth)monthSel.value=prevMonth;
 }
 async function loadBookingTendency(){
   const customerId=document.getElementById('tendency-customer-select').value;
   if(!customerId){showToast('会員を選択してください');return;}
   const isAll=customerId==='__all__';
+  const monthValue=document.getElementById('tendency-month-select').value; // "" = 全期間, "YYYY-MM" = その月だけ
   document.getElementById('tendency-staff-table').innerHTML='<div class="loading">集計中...</div>';
   document.getElementById('tendency-time-table').innerHTML='';
   document.getElementById('tendency-dow-table').innerHTML='';
 
-  let bookingQuery=sbClient.from('bookings').select('*, menus(name)').in('status',['confirmed','completed']).order('scheduled_at',{ascending:true});
+  // ★ 上限を指定せず昇順で取得すると、Supabaseのデフォルト行数上限に達した際に
+  //    「一番新しいデータ」から切り捨てられてしまう不具合があったため、降順＋明示的な上限に変更
+  let bookingQuery=sbClient.from('bookings').select('*, menus(name)').in('status',['confirmed','completed']).order('scheduled_at',{ascending:false}).limit(5000);
   if(!isAll)bookingQuery=bookingQuery.eq('customer_id',customerId);
+  let monthRangeStart=null, monthRangeEnd=null; // 月別集計を選んだ場合の期間（カレンダー月まるごと）
+  if(monthValue){
+    const[my,mm]=monthValue.split('-').map(Number);
+    monthRangeStart=new Date(my,mm-1,1);
+    monthRangeEnd=new Date(my,mm,0);
+    bookingQuery=bookingQuery.gte('scheduled_at',`${monthValue}-01`).lt('scheduled_at',toLocalDateStr(new Date(my,mm,1)));
+  }
   const{data:bookings,error}=await bookingQuery;
   if(error){document.getElementById('tendency-staff-table').innerHTML='<div class="loading">集計に失敗しました</div>';return;}
-  if(!bookings||!bookings.length){document.getElementById('tendency-staff-table').innerHTML=`<div class="loading">${isAll?'予約履歴（確定・完了）がありません':'この会員の予約履歴（確定・完了）がありません'}</div>`;return;}
+  if(!bookings||!bookings.length){document.getElementById('tendency-staff-table').innerHTML=`<div class="loading">${isAll?'対象期間の予約履歴（確定・完了）がありません':'この会員の対象期間の予約履歴（確定・完了）がありません'}</div>`;return;}
 
   // 該当する日付分だけ日付指定設定を取得し、週間テンプレートと合わせて時間帯ごとの担当スタッフを引けるようにする
   const dates=[...new Set(bookings.map(b=>b.scheduled_at.slice(0,10)))];
@@ -1525,7 +1548,7 @@ async function loadBookingTendency(){
   const totalBookings=bookings.length;
   const countedBookings=totalBookings-multiStaffExcluded;
   const staffRows=Object.entries(staffCounts).sort((a,b)=>b[1]-a[1]);
-  let staffHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">対象予約件数（確定・完了）：${totalBookings}件${isAll?'（全会員合計）':''}　／　うち1人体制で集計対象：${countedBookings}件${multiStaffExcluded>0?`　／　2人体制のため集計対象外：${multiStaffExcluded}件`:''}</p><table><thead><tr><th>スタッフ</th><th>回数</th><th>割合</th></tr></thead><tbody>`;
+  let staffHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">対象期間：${monthValue?`${monthValue.split('-')[0]}年${parseInt(monthValue.split('-')[1])}月`:'全期間'}　／　対象予約件数（確定・完了）：${totalBookings}件${isAll?'（全会員合計）':''}　／　うち1人体制で集計対象：${countedBookings}件${multiStaffExcluded>0?`　／　2人体制のため集計対象外：${multiStaffExcluded}件`:''}</p><table><thead><tr><th>スタッフ</th><th>回数</th><th>割合</th></tr></thead><tbody>`;
   for(const[name,cnt]of staffRows){
     const pct=countedBookings>0?Math.round((cnt/countedBookings)*1000)/10:0;
     staffHtml+=`<tr><td style="font-weight:600;">${name}</td><td>${cnt}</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill bar-green" style="width:${pct}%"></div></div><div class="bar-text">${pct}%</div></div></td></tr>`;
@@ -1533,17 +1556,24 @@ async function loadBookingTendency(){
   staffHtml+='</tbody></table>';
   document.getElementById('tendency-staff-table').innerHTML=staffHtml;
 
-  // 集計期間（データに含まれる最古〜最新の予約日）を算出し、「平均」の分母に使う
-  const bookingDates=bookings.map(b=>{const s=b.scheduled_at.slice(0,10);return new Date(s+'T00:00:00');});
-  const minDate=new Date(Math.min(...bookingDates));
-  const maxDate=new Date(Math.max(...bookingDates));
+  // 集計期間を算出し、「平均」の分母に使う。
+  // 月別集計を選んだ場合はその月まるごと（予約が無い曜日も分母に正しく含めるため）、
+  // 全期間の場合はデータに含まれる最古〜最新の予約日を使う
+  let minDate,maxDate;
+  if(monthRangeStart&&monthRangeEnd){
+    minDate=monthRangeStart;maxDate=monthRangeEnd;
+  } else {
+    const bookingDates=bookings.map(b=>{const s=b.scheduled_at.slice(0,10);return new Date(s+'T00:00:00');});
+    minDate=new Date(Math.min(...bookingDates));
+    maxDate=new Date(Math.max(...bookingDates));
+  }
   const totalDaysInRange=Math.round((maxDate-minDate)/(1000*60*60*24))+1;
   const dowOccurrences=[0,0,0,0,0,0,0];
   {
     let d=new Date(minDate);
     while(d<=maxDate){dowOccurrences[d.getDay()]++;d.setDate(d.getDate()+1);}
   }
-  const periodLabel=`${toLocalDateStr(minDate)} 〜 ${toLocalDateStr(maxDate)}（${totalDaysInRange}日間）`;
+  const periodLabel=monthValue?`${toLocalDateStr(minDate)} 〜 ${toLocalDateStr(maxDate)}（${monthValue.split('-')[0]}年${parseInt(monthValue.split('-')[1])}月まるごと）`:`${toLocalDateStr(minDate)} 〜 ${toLocalDateStr(maxDate)}（${totalDaysInRange}日間）`;
 
   // 時間帯別テーブル（平均＝その時間帯の合計予約数 ÷ 集計期間の日数。少ない順に並べ替え、シフト・店休日検討の目安に）
   let timeHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">集計期間：${periodLabel}　／　平均は1日あたりの件数です。少ない順に並んでいます。</p><table><thead><tr><th>時間帯</th><th>合計回数</th><th>1日あたり平均</th><th></th></tr></thead><tbody>`;
