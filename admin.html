@@ -1575,13 +1575,13 @@ async function loadBookingTendency(){
   }
   const periodLabel=monthValue?`${toLocalDateStr(minDate)} 〜 ${toLocalDateStr(maxDate)}（${monthValue.split('-')[0]}年${parseInt(monthValue.split('-')[1])}月まるごと）`:`${toLocalDateStr(minDate)} 〜 ${toLocalDateStr(maxDate)}（${totalDaysInRange}日間）`;
 
-  // 時間帯別テーブル（平均＝その時間帯の合計予約数 ÷ 集計期間の日数。少ない順に並べ替え、シフト・店休日検討の目安に）
-  let timeHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">集計期間：${periodLabel}　／　平均は1日あたりの件数です。少ない順に並んでいます。</p><table><thead><tr><th>時間帯</th><th>合計回数</th><th>1日あたり平均</th><th></th></tr></thead><tbody>`;
+  // 時間帯別テーブル（平均＝その時間帯の合計予約数 ÷ 集計期間の日数。多い順に並べ替え、シフト・店休日検討の目安に）
+  let timeHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">集計期間：${periodLabel}　／　平均は1日あたりの件数です。多い順に並んでいます。</p><table><thead><tr><th>時間帯</th><th>合計回数</th><th>1日あたり平均</th><th></th></tr></thead><tbody>`;
   const timeRows=DEFAULT_SLOTS.map(slot=>{
     const cnt=timeCounts[slot]||0;
     const avg=totalDaysInRange>0?Math.round((cnt/totalDaysInRange)*100)/100:0;
     return{slot,cnt,avg};
-  }).sort((a,b)=>a.avg-b.avg);
+  }).sort((a,b)=>b.avg-a.avg);
   const maxTimeAvg=Math.max(0.01,...timeRows.map(r=>r.avg));
   for(const r of timeRows){
     const pct=Math.round((r.avg/maxTimeAvg)*100);
@@ -1591,14 +1591,14 @@ async function loadBookingTendency(){
   timeHtml+='</tbody></table>';
   document.getElementById('tendency-time-table').innerHTML=timeHtml;
 
-  // 曜日別テーブル（平均＝その曜日の合計予約数 ÷ 集計期間中その曜日が何回あったか。少ない順に並べ替え）
-  let dowHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">集計期間：${periodLabel}　／　平均はその曜日1回あたりの件数です。少ない順に並んでいます。</p><table><thead><tr><th>曜日</th><th>合計回数</th><th>1回あたり平均</th><th></th></tr></thead><tbody>`;
+  // 曜日別テーブル（平均＝その曜日の合計予約数 ÷ 集計期間中その曜日が何回あったか。多い順に並べ替え）
+  let dowHtml=`<p style="font-size:12px;color:#888;margin-bottom:10px;">集計期間：${periodLabel}　／　平均はその曜日1回あたりの件数です。多い順に並んでいます。</p><table><thead><tr><th>曜日</th><th>合計回数</th><th>1回あたり平均</th><th></th></tr></thead><tbody>`;
   const dowRows=[0,1,2,3,4,5,6].map(d=>{
     const cnt=dowCounts[d]||0;
     const occ=dowOccurrences[d]||0;
     const avg=occ>0?Math.round((cnt/occ)*100)/100:0;
     return{d,cnt,occ,avg};
-  }).sort((a,b)=>a.avg-b.avg);
+  }).sort((a,b)=>b.avg-a.avg);
   const maxDowAvg=Math.max(0.01,...dowRows.map(r=>r.avg));
   for(const r of dowRows){
     const pct=Math.round((r.avg/maxDowAvg)*100);
