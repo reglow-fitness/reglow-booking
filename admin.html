@@ -856,25 +856,37 @@ function getWeekStart(date){const d=new Date(date);d.setDate(d.getDate()-d.getDa
 function changeWeek(dir){currentWeekStart.setDate(currentWeekStart.getDate()+dir*7);renderWeekCalendar();}
 async function renderWeekCalendar(){if(!sbClient)return;if(!currentWeekStart)currentWeekStart=getWeekStart(new Date());const weekEnd=new Date(currentWeekStart);weekEnd.setDate(weekEnd.getDate()+6);weekEnd.setHours(23,59,59,999);const mn=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];document.getElementById('week-label').textContent=`${currentWeekStart.getFullYear()}年${mn[currentWeekStart.getMonth()]}${currentWeekStart.getDate()}日 〜 ${mn[weekEnd.getMonth()]}${weekEnd.getDate()}日`;const{data:bookings}=await sbClient.from('bookings').select('*, customers(name), menus(name,ticket_cost)').gte('scheduled_at',toLocalDateStr(currentWeekStart)+'T00:00:00').lte('scheduled_at',toLocalDateStr(weekEnd)+'T23:59:59').eq('status','confirmed').order('scheduled_at',{ascending:true});const dn=['日','月','火','水','木','金','土'];const days=[];for(let i=0;i<7;i++){const d=new Date(currentWeekStart);d.setDate(d.getDate()+i);days.push(d);}const today=new Date();today.setHours(0,0,0,0);let html='<div style="display:grid;grid-template-columns:56px repeat(7,1fr);border-bottom:2px solid #e8e8e8;"><div></div>';for(const d of days){const isToday=d.getTime()===today.getTime();const col=d.getDay()===0?'#e06060':d.getDay()===6?'#6090e0':'#333';html+=`<div style="padding:8px 4px;text-align:center;${isToday?'background:#f0fdf4;':''}"><div style="font-size:11px;color:${col};font-weight:600;">${dn[d.getDay()]}</div><div style="font-size:16px;font-weight:${isToday?'700':'500'};color:${isToday?'#06C755':col};">${d.getDate()}</div></div>`;}html+='</div><div style="display:grid;grid-template-columns:56px repeat(7,1fr);">';for(const slot of TIME_SLOTS){const[h]=slot.split(':');html+=`<div style="padding:6px 4px;font-size:11px;color:#aaa;text-align:right;border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;display:flex;align-items:flex-start;justify-content:flex-end;">${slot}</div>`;for(const d of days){const isToday=d.getTime()===today.getTime();const dayB=(bookings||[]).filter(b=>{const bd=new Date(b.scheduled_at);return bd.getFullYear()===d.getFullYear()&&bd.getMonth()===d.getMonth()&&bd.getDate()===d.getDate()&&bd.getHours()===parseInt(h);});let cellHtml='';for(const b of dayB){const tc=b.menus?.ticket_cost;const mk=tc>0?'A':b.menus?.name?.includes('体験')?'B':'C';const mc=MENU_COLORS[mk]||MENU_COLORS['A'];cellHtml+=`<div style="background:${mc.bg};border:1px solid ${mc.border};border-radius:6px;padding:2px 6px;font-size:11px;color:${mc.color};margin-bottom:2px;cursor:pointer;" onclick="showBookingDetail('${b.id}','${(b.customers?.name||'').replace(/'/g,'`')}','${b.menus?.name||''}','${b.scheduled_at}')"><span style="font-weight:600;">${b.customers?.name?.slice(0,4)||'—'}</span></div>`;}html+=`<div style="border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;padding:2px;${isToday?'background:#fafffe;':''}">${cellHtml}</div>`;}}html+='</div>';document.getElementById('week-grid').innerHTML=html;}
 function showBookingDetail(id,name,menu,scheduledAt){const dt=new Date(scheduledAt);const dn=['日','月','火','水','木','金','土'];const dtStr=`${dt.getMonth()+1}月${dt.getDate()}日（${dn[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;if(confirm(`【${name}】\n${menu}\n${dtStr}\n\nこの予約をキャンセルしますか？`))cancelBooking(id);}
-async function loadBookingList(){if(!sbClient)return;await ensureStaffLoaded();const{data,error}=await sbClient.from('bookings').select('*, customers(name, line_picture_url), menus(name)').order('scheduled_at',{ascending:false}).limit(50);if(error||!data||!data.length){document.getElementById('booking-list').innerHTML='<div class="loading">予約がありません</div>';return;}let html='<table><thead><tr><th>日時</th><th>顧客</th><th>メニュー</th><th>担当</th><th>状態</th><th>操作</th></tr></thead><tbody>';for(const b of data){const dt=new Date(b.scheduled_at);const dtStr=`${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;const sm={confirmed:['確定','badge-green'],cancelled:['キャンセル','badge-red'],completed:['完了','badge-gray']};const[label,cls]=sm[b.status]||['—','badge-gray'];const staffOptions=`<option value="">未設定</option>`+allStaff.map(s=>`<option value="${s.id}" ${b.staff_id===s.id?'selected':''}>${s.name}</option>`).join('');html+=`<tr><td style="font-weight:600;">${dtStr}</td><td><div class="name-cell">${renderAvatar(b.customers||{name:'—'},26)}${b.customers?.name||'—'}</div></td><td>${b.menus?.name||'—'}</td><td><select class="form-input" style="font-size:12px;padding:4px 6px;" onchange="updateBookingStaff('${b.id}',this.value)">${staffOptions}</select></td><td><span class="badge ${cls}">${label}</span></td><td>${b.status==='confirmed'?`<button class="btn btn-sm btn-danger" onclick="cancelBooking('${b.id}')">キャンセル</button>`:'—'}</td></tr>`;}html+='</tbody></table>';document.getElementById('booking-list').innerHTML=html;}
+async function loadBookingList(){if(!sbClient)return;await ensureStaffLoaded();const{data,error}=await sbClient.from('bookings').select('*, customers(name, line_picture_url), menus(name)').order('scheduled_at',{ascending:false}).limit(50);if(error||!data||!data.length){document.getElementById('booking-list').innerHTML='<div class="loading">予約がありません</div>';return;}let html='<table><thead><tr><th>日時</th><th>顧客</th><th>メニュー</th><th>担当</th><th>状態</th><th>操作</th></tr></thead><tbody>';for(const b of data){const dt=new Date(b.scheduled_at);const dtStr=`${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;const sm={confirmed:['確定','badge-green'],cancelled:['キャンセル','badge-red'],completed:['完了','badge-gray']};const[label,cls]=sm[b.status]||['—','badge-gray'];const syncBadge=b.gcal_sync_error?`<span class="badge badge-amber" title="${b.gcal_sync_error}" style="margin-left:4px;">⚠️カレンダー同期エラー</span>`:'';const staffOptions=`<option value="">未設定</option>`+allStaff.map(s=>`<option value="${s.id}" ${b.staff_id===s.id?'selected':''}>${s.name}</option>`).join('');html+=`<tr><td style="font-weight:600;">${dtStr}</td><td><div class="name-cell">${renderAvatar(b.customers||{name:'—'},26)}${b.customers?.name||'—'}</div></td><td>${b.menus?.name||'—'}</td><td><select class="form-input" style="font-size:12px;padding:4px 6px;" onchange="updateBookingStaff('${b.id}',this.value)">${staffOptions}</select></td><td><span class="badge ${cls}">${label}</span>${syncBadge}</td><td>${b.status==='confirmed'?`<button class="btn btn-sm btn-danger" onclick="cancelBooking('${b.id}')">キャンセル</button>`:'—'}</td></tr>`;}html+='</tbody></table>';document.getElementById('booking-list').innerHTML=html;}
 async function updateBookingStaff(bookingId,staffId){const{error}=await sbClient.from('bookings').update({staff_id:staffId||null}).eq('id',bookingId);if(error){showToast('担当者の更新に失敗しました');return;}showToast('担当者を更新しました');}
 async function loadBookings(){if(!sbClient)return;currentWeekStart=getWeekStart(new Date());setBookingView('calendar');}
 async function cancelBooking(id){
   if(!confirm('この予約をキャンセルしますか？'))return;
   const{data:booking}=await sbClient.from('bookings').select('*, gcal_event_id').eq('id',id).single();
-  if(booking?.gcal_event_id){fetch('https://script.google.com/macros/s/AKfycbzBBEQ_e91nn_1nuTaIS2XTs7_Qys36LcipJzSXtkt-mM6WS8UBhNl6IeLNxLHQOdjeuw/exec',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'delete',eventId:booking.gcal_event_id})}).catch(e=>console.log('GCal delete error:',e));}
-  const{error}=await sbClient.from('bookings').update({status:'cancelled', cancelled_at: new Date().toISOString()}).eq('id',id);
+  let gcalSyncError=null;
+  if(booking?.gcal_event_id){
+    try{
+      const delRes=await fetch('https://script.google.com/macros/s/AKfycbzBBEQ_e91nn_1nuTaIS2XTs7_Qys36LcipJzSXtkt-mM6WS8UBhNl6IeLNxLHQOdjeuw/exec',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'delete',eventId:booking.gcal_event_id})});
+      if(!delRes.ok)gcalSyncError='カレンダー削除に失敗しました';
+    }catch(e){console.log('GCal delete error:',e);gcalSyncError='カレンダー削除に失敗しました';}
+  }
+  const{error}=await sbClient.from('bookings').update({status:'cancelled', cancelled_at: new Date().toISOString(), gcal_sync_error: gcalSyncError}).eq('id',id);
   if(error){showToast('キャンセルに失敗しました');return;}
-  showToast('予約をキャンセルしました');
+  showToast(gcalSyncError?'予約をキャンセルしました（⚠️Googleカレンダーの削除に失敗。予約一覧で確認してください）':'予約をキャンセルしました');
   if(currentBookingView==='calendar')await renderWeekCalendar();else if(currentBookingView==='list')await loadBookingList();else await loadActivityLog();
 }
 async function cancelBookingFromPanel(bookingId,customerId){
   if(!confirm('この予約をキャンセルしますか？'))return;
   const{data:booking}=await sbClient.from('bookings').select('*, menus(ticket_cost), gcal_event_id').eq('id',bookingId).single();
-  if(booking?.gcal_event_id){fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'delete',eventId:booking.gcal_event_id})}).catch(e=>console.log('GCal delete error:',e));}
-  const{error}=await sbClient.from('bookings').update({status:'cancelled', cancelled_at: new Date().toISOString()}).eq('id',bookingId);
+  let gcalSyncError=null;
+  if(booking?.gcal_event_id){
+    try{
+      const delRes=await fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'delete',eventId:booking.gcal_event_id})});
+      if(!delRes.ok)gcalSyncError='カレンダー削除に失敗しました';
+    }catch(e){console.log('GCal delete error:',e);gcalSyncError='カレンダー削除に失敗しました';}
+  }
+  const{error}=await sbClient.from('bookings').update({status:'cancelled', cancelled_at: new Date().toISOString(), gcal_sync_error: gcalSyncError}).eq('id',bookingId);
   if(error){showToast('キャンセルに失敗しました');return;}
-  showToast('予約をキャンセルしました');await loadCustomers();
+  showToast(gcalSyncError?'予約をキャンセルしました（⚠️Googleカレンダーの削除に失敗。予約一覧で確認してください）':'予約をキャンセルしました');await loadCustomers();
   const spEl=document.getElementById('sp-panel-'+customerId);if(spEl&&spEl.style.display!=='none')spEl.innerHTML=await buildPanelHTML(customerId);
   const pcEl=document.getElementById('ticket-panel-'+customerId);if(pcEl&&pcEl.style.display!=='none')document.getElementById('ticket-panel-inner-'+customerId).innerHTML=await buildPanelHTML(customerId);
 }
@@ -885,8 +897,12 @@ async function deleteBookingRecord(bookingId,customerId,ticketCost,ticketId){
     returnTicket=confirm('チケット消化済みの予約です。\n\nOK：チケットを1回分返却してから削除する\nキャンセル：チケットは返却せず削除する');
   }
   const{data:booking}=await sbClient.from('bookings').select('*, gcal_event_id').eq('id',bookingId).single();
+  let gcalDeleteFailed=false;
   if(booking?.gcal_event_id){
-    fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'delete',eventId:booking.gcal_event_id})}).catch(e=>console.log('GCal delete error:',e));
+    try{
+      const delRes=await fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'delete',eventId:booking.gcal_event_id})});
+      if(!delRes.ok)gcalDeleteFailed=true;
+    }catch(e){console.log('GCal delete error:',e);gcalDeleteFailed=true;}
   }
   const{error}=await sbClient.from('bookings').delete().eq('id',bookingId);
   if(error){showToast('削除に失敗しました');return;}
@@ -897,6 +913,10 @@ async function deleteBookingRecord(bookingId,customerId,ticketCost,ticketId){
       const newRemaining=isCouponTicket?(latestTicket.remaining_count||0)+1:Math.min((latestTicket.remaining_count||0)+1,latestTicket.total_count);
       await sbClient.from('tickets').update({remaining_count:newRemaining}).eq('id',latestTicket.id);
     }
+  }
+  // ★ この予約行は削除済み＝gcal_event_idの記録も失われるので、削除に失敗していた場合は今のうちに手動対応を促す
+  if(gcalDeleteFailed){
+    alert(`⚠️ Googleカレンダーの予定を削除できませんでした。お手数ですが、カレンダーから手動で削除してください。\nイベントID: ${booking?.gcal_event_id||'不明'}`);
   }
   showToast(returnTicket?'予約履歴を削除し、チケットを1回分返却しました':'予約履歴を削除しました');
   await loadCustomers();
