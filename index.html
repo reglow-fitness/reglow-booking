@@ -801,18 +801,24 @@ async function submitBooking(){
   if(error){btn.disabled=false;btn.textContent='この日時で予約を確定する';alert('予約に失敗しました。もう一度お試しください。');return;}
   const newBookingId = newBooking?.id;
   if(newBookingId){
-    (async()=>{
-      try{
-        const gcalRes = await fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec',{
-          method:'POST', headers:{'Content-Type':'text/plain'},
-          body:JSON.stringify({action:'create', bookingId:newBookingId, customerName:currentCustomer?.name||'Unknown', menuName:selectedMenu.name, startTime:dt.toISOString()})
-        });
-        const gcalData = await gcalRes.json();
-        if(gcalData.eventId){
-          await sbClient.from('bookings').update({gcal_event_id:gcalData.eventId}).eq('id',newBookingId);
-        }
-      }catch(e){console.log('GCal error:',e);}
-    })();
+    // ★ 以前はここを待たずに完了画面へ進んでいたため、登録直後にキャンセルされるとgcal_event_idが
+    //    未保存のままキャンセル処理が走り、カレンダーの予定が削除できず残ってしまう不具合があった。
+    //    完了画面に進む前に必ずカレンダー登録の結果を待ち、失敗した場合はgcal_sync_errorに記録する。
+    try{
+      const gcalRes = await fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec',{
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'create', bookingId:newBookingId, customerName:currentCustomer?.name||'Unknown', menuName:selectedMenu.name, startTime:dt.toISOString()})
+      });
+      const gcalData = await gcalRes.json();
+      if(gcalData.eventId){
+        await sbClient.from('bookings').update({gcal_event_id:gcalData.eventId, gcal_sync_error:null}).eq('id',newBookingId);
+      } else {
+        await sbClient.from('bookings').update({gcal_sync_error:'カレンダー登録に失敗しました（イベントID未取得）'}).eq('id',newBookingId);
+      }
+    }catch(e){
+      console.log('GCal error:',e);
+      await sbClient.from('bookings').update({gcal_sync_error:'カレンダー登録時に通信エラーが発生しました'}).eq('id',newBookingId).catch(()=>{});
+    }
   }
   if(selectedMenu.ticket_cost>0 && bookingTicket && bookingTicket.plan_type!=='unlimited'){
     const nr=bookingTicket.remaining_count-selectedMenu.ticket_cost;
@@ -880,14 +886,21 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
     if(!confirm('この予約をキャンセルしますか？'))return;
   }
   const {data:booking}=await sbClient.from('bookings').select('*,menus(ticket_cost),gcal_event_id').eq('id',id).single();
+  let gcalSyncError=null;
   if(booking?.gcal_event_id){
-    fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec', {
-      method: 'POST',
-      headers: {'Content-Type': 'text/plain'},
-      body: JSON.stringify({action:'delete', eventId: booking.gcal_event_id})
-    }).catch(e=>console.log('GCal delete error:',e));
+    try{
+      const delRes = await fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec', {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain'},
+        body: JSON.stringify({action:'delete', eventId: booking.gcal_event_id})
+      });
+      if(!delRes.ok) gcalSyncError='カレンダー削除に失敗しました（通信エラー）';
+    }catch(e){
+      console.log('GCal delete error:',e);
+      gcalSyncError='カレンダー削除に失敗しました（通信エラー）';
+    }
   }
-  await sbClient.from('bookings').update({status:'cancelled', cancelled_at: now.toISOString(), late_cancel_forgiven: useGraceQuota}).eq('id',id);
+  await sbClient.from('bookings').update({status:'cancelled', cancelled_at: now.toISOString(), late_cancel_forgiven: useGraceQuota, gcal_sync_error: gcalSyncError}).eq('id',id);
   if(booking?.ticket_id){
     const {data:latestTicket} = await sbClient.from('tickets').select('*').eq('id',booking.ticket_id).single();
     if(latestTicket && latestTicket.plan_type !== 'unlimited'){
