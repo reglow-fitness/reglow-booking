@@ -187,7 +187,7 @@ async function submitEntry(category){
 }
 
 async function loadHistory(){
-  const {data} = await sbClient.from('session_reports').select('*').eq('staff_id', currentStaff.id).order('report_date',{ascending:false}).order('session_time',{ascending:false}).limit(30);
+  const {data} = await sbClient.from('session_reports').select('*').eq('staff_id', currentStaff.id).order('report_date',{ascending:false}).order('session_time',{ascending:false}).limit(2000);
   historyEntries = data || [];
   renderHistory();
 }
