@@ -433,6 +433,13 @@
           <button class="btn btn-danger" id="delete-expired-btn" style="display:none;" onclick="deleteExpiredTickets()">🗑 期限切れを一括削除する</button>
         </div>
       </div>
+      <!-- ★ チケット残数の整合性チェック -->
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:8px;">🔍 チケット残数の整合性チェック</strong>
+        <p style="font-size:13px;color:#888;margin-bottom:14px;line-height:1.7;">保存されているチケット残数と、実際の予約実績（確定・完了した予約の件数）から計算した残数を比較し、ズレているものを一覧表示します。<br>回数券・プレミアム（無制限）プランは手動管理のため対象外です。</p>
+        <button class="btn" onclick="checkTicketIntegrity()">🔍 確認する</button>
+        <div id="ticket-integrity-result" style="margin-top:12px;"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1140,6 +1147,48 @@ async function deleteExpiredTickets(){
   document.getElementById('expired-ticket-preview').innerHTML='<span style="color:#06C755;">✅ 削除しました</span>';
   document.getElementById('delete-expired-btn').style.display='none';
   showToast(`${data.length}件の期限切れチケットを削除しました`);
+  await loadCustomers();
+}
+// ★ チケット残数の整合性チェック（保存されているremaining_countと、実際の予約実績から計算した値を比較）
+async function checkTicketIntegrity(){
+  const el=document.getElementById('ticket-integrity-result');
+  el.innerHTML='<div class="loading">確認中...</div>';
+  const{data:tickets,error:e1}=await sbClient.from('tickets').select('*, customers(name)').in('plan_type',['4','8']);
+  if(e1){el.innerHTML='<div class="loading">確認に失敗しました</div>';return;}
+  if(!tickets||!tickets.length){el.innerHTML='<div class="loading">対象のチケットがありません</div>';return;}
+  const ticketIds=tickets.map(t=>t.id);
+  const{data:bookings,error:e2}=await sbClient.from('bookings').select('ticket_id').in('ticket_id',ticketIds).in('status',['confirmed','completed']);
+  if(e2){el.innerHTML='<div class="loading">確認に失敗しました</div>';return;}
+  const consumedByTicket={};
+  for(const b of(bookings||[])){
+    if(!b.ticket_id)continue;
+    consumedByTicket[b.ticket_id]=(consumedByTicket[b.ticket_id]||0)+1;
+  }
+  const mismatches=[];
+  for(const t of tickets){
+    const consumed=consumedByTicket[t.id]||0;
+    const expected=Math.max(0,(t.total_count||0)-consumed);
+    if(expected!==t.remaining_count)mismatches.push({ticket:t,expected,consumed});
+  }
+  if(!mismatches.length){
+    el.innerHTML='<span style="color:#06C755;">✅ 不整合は見つかりませんでした</span>';
+    return;
+  }
+  let html=`<div style="background:#ffeaea;border-radius:8px;padding:10px 14px;margin-bottom:10px;"><strong style="color:#c0392b;">${mismatches.length}件のチケットで不整合が見つかりました</strong></div>`;
+  html+='<table><thead><tr><th>会員</th><th>プラン</th><th>期間</th><th>保存されている残数</th><th>予約実績からの想定残数</th><th>操作</th></tr></thead><tbody>';
+  for(const m of mismatches){
+    const t=m.ticket;
+    html+=`<tr><td>${t.customers?.name||'—'}</td><td>${PLAN_NAMES[t.plan_type]||t.plan_type}</td><td style="font-size:12px;color:#888;">${t.valid_from||'—'}〜${t.expires_at||'—'}</td><td style="font-weight:600;">${t.remaining_count}</td><td style="font-weight:600;color:#c0392b;">${m.expected}</td><td><button class="btn btn-sm btn-primary" onclick="fixTicketMismatch('${t.id}',${m.expected})">この数値に修正</button></td></tr>`;
+  }
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+async function fixTicketMismatch(ticketId,correctValue){
+  if(!confirm(`残数を ${correctValue} に修正しますか？`))return;
+  const{error}=await sbClient.from('tickets').update({remaining_count:correctValue}).eq('id',ticketId);
+  if(error){showToast('修正に失敗しました');return;}
+  showToast('修正しました');
+  await checkTicketIntegrity();
   await loadCustomers();
 }
 async function toggleBlockClient(id,name,isBlocked){const msg=isBlocked?`${name} さんのブロックを解除しますか？`:`${name} さんをブロックしますか？\n全メニューの予約ができなくなります。`;if(!confirm(msg))return;const{error}=await sbClient.from('customers').update({is_blocked:!isBlocked}).eq('id',id);if(error){showToast('更新に失敗しました');return;}showToast(isBlocked?'ブロックを解除しました':`${name} さんをブロックしました`);await loadCustomers();}
