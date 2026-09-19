@@ -700,6 +700,17 @@ async function buildPanelHTML(customerId){
     tHtml+=`<div class="ticket-item"><span class="badge ${pc}">${PLAN_NAMES[t.plan_type]||t.plan_type}</span><span class="ticket-item-period">${period}</span><span class="ticket-item-count">${cnt}</span>${statusLabel}${dec}${inc}<button class="btn btn-sm btn-danger" onclick="deleteTicket('${t.id}','${customerId}')">削除</button></div>`;
   }}
   tHtml+='</div>';
+  // ★ 個別の同時保持予約数上限（既存の allClients から会員情報を参照）
+  const customerObj = allClients.find(c=>c.id===customerId);
+  if(customerObj){
+    const limitDisplay = customerObj.concurrent_booking_limit
+      ? `<span class="badge badge-purple">個別 ${customerObj.concurrent_booking_limit}件</span>`
+      : `<span style="color:#aaa;">無制限</span>`;
+    tHtml += `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px 4px 0;border-top:1px solid #eef8f3;font-size:12px;color:#555;">
+      <span>🔢 同時に保持できる予約数の上限</span>
+      <span>${limitDisplay} <button class="btn btn-sm" style="margin-left:6px;" onclick="editConcurrentLimit('${customerId}','${customerObj.name.replace(/'/g,"\\'")}',${customerObj.concurrent_booking_limit??'null'})">設定</button></span>
+    </div>`;
+  }
   // ★ 予約履歴は「直近20件」だと予約頻度の高い会員で古い月が丸ごと見えなくなるため、月ごとにグルーピング。
   //    当月は展開表示、それより前の月は折りたたみ表示にする
   let bHtml='<div class="booking-panel" style="margin-top:8px;"><div class="booking-panel-title">📅 予約履歴</div>';
@@ -1014,6 +1025,7 @@ async function checkLogin(){
 }
 // ★ 期限切れチケット確認・削除
 // ★ 先月以前の予約枠設定確認・削除
+/* ★ プランごとの同時保持予約数の上限機能は「個別設定のみ」に一本化したため撤去（customers.concurrent_booking_limitのみ使用） */
 async function previewOldSlots(){
   if(!sbClient){showToast('Supabaseが未接続です');return;}
   const now=new Date();
@@ -1131,6 +1143,22 @@ async function deleteExpiredTickets(){
   await loadCustomers();
 }
 async function toggleBlockClient(id,name,isBlocked){const msg=isBlocked?`${name} さんのブロックを解除しますか？`:`${name} さんをブロックしますか？\n全メニューの予約ができなくなります。`;if(!confirm(msg))return;const{error}=await sbClient.from('customers').update({is_blocked:!isBlocked}).eq('id',id);if(error){showToast('更新に失敗しました');return;}showToast(isBlocked?'ブロックを解除しました':`${name} さんをブロックしました`);await loadCustomers();}
+// ★ 個別の同時保持予約数上限（プラン設定より優先）
+async function editConcurrentLimit(id,name,current){
+  const input=prompt(`${name} さんの「同時に保持できる予約数」を個別に設定します。\n空欄にすると無制限に戻ります。`, current==null?'':String(current));
+  if(input===null)return;
+  const trimmed=input.trim();
+  let newValue=null;
+  if(trimmed!==''){
+    const n=parseInt(trimmed);
+    if(isNaN(n)||n<=0){showToast('1以上の数字を入力してください');return;}
+    newValue=n;
+  }
+  const{error}=await sbClient.from('customers').update({concurrent_booking_limit:newValue}).eq('id',id);
+  if(error){showToast('更新に失敗しました');return;}
+  showToast(newValue?`${name} さんの予約上限を${newValue}件に設定しました`:`${name} さんの予約上限を無制限に戻しました`);
+  await loadCustomers();
+}
 /* ===================== スタッフ管理 ===================== */
 async function loadStaffManage(){
   if(!sbClient)return;
