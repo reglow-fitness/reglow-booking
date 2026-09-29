@@ -245,6 +245,7 @@ let calYear, calMonth;
 let screenHistory = [];
 let allMenus = [];
 let isViewOnlyMode = false;
+let isSubmittingBooking = false; // ★ 連打・多重送信によって同じ予約が複数回送られるのを防ぐガード
 async function init() {
   sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const now = new Date();
@@ -640,6 +641,17 @@ function renderConfirm(){
   if(warnEl) warnEl.style.display = (selectedMenu.ticket_cost>0 && !isUnlimitedTicket) ? '' : 'none';
 }
 async function submitBooking(){
+  // ★ 連打・多重送信ガード：ボタンのdisabled化が間に合わない一瞬の連打でも、
+  //    同じ予約リクエストが複数同時に飛ぶのを確実に防ぐ
+  if(isSubmittingBooking) return;
+  isSubmittingBooking = true;
+  try{
+    await submitBookingInner();
+  } finally {
+    isSubmittingBooking = false;
+  }
+}
+async function submitBookingInner(){
   const btn=document.getElementById('confirm-submit-btn');
   btn.disabled=true;btn.textContent='送信中...';
   // ★ 過去の日時への予約を防ぐ最終チェック（カレンダー表示の不具合等で選択されてしまった場合の保険）
