@@ -680,6 +680,24 @@ async function submitBooking(){
         return;
       }
     }
+    // ★ プランごとの同時保持予約数の上限チェック（管理画面「設定」で設定）。
+    //    予約日時を過ぎた予約は自動的に「消化済み」扱いとしてカウントから外す（＝今から見て未来の確定予約のみ数える）
+    // ★ 個別設定（customers.concurrent_booking_limit）が入っている会員のみ上限チェックを行う（プラン既定値は今回使わない）
+    const concurrentLimit = currentCustomer?.concurrent_booking_limit || null;
+    if(concurrentLimit){
+      const nowISO = new Date().toISOString();
+      const { count: heldCount } = await sbClient.from('bookings')
+        .select('id, menus!inner(ticket_cost)', { count: 'exact', head: true })
+        .eq('customer_id', currentCustomer.id)
+        .eq('status', 'confirmed')
+        .gte('scheduled_at', nowISO)
+        .gt('menus.ticket_cost', 0);
+      if((heldCount||0) >= concurrentLimit){
+        btn.disabled=false; btn.textContent='この日時で予約を確定する';
+        alert(`現在保持できる予約件数の上限（${concurrentLimit}件）に達しています。\n既存の予約の日時が過ぎるか、キャンセルされると、新しい予約ができるようになります。`);
+        return;
+      }
+    }
   }
   const [chk_h, chk_m] = selectedTime.split(':');
   const chkStart = new Date(selectedDate);
@@ -800,6 +818,24 @@ async function submitBooking(){
   }).select('id').single();
   if(error){btn.disabled=false;btn.textContent='この日時で予約を確定する';alert('予約に失敗しました。もう一度お試しください。');return;}
   const newBookingId = newBooking?.id;
+  // ★ チケット消化は「読み取って-1して書き込む」方式だと、同時に複数の予約が走った際に
+  //    更新が競合して残数チェックをすり抜けてしまう不具合があったため、DB側で確実に1件ずつ処理される
+  //    atomic RPC（decrement_ticket_count）に変更。残数が足りない場合は予約自体を取り消す。
+  if(selectedMenu.ticket_cost>0 && bookingTicket && bookingTicket.plan_type!=='unlimited'){
+    const { data: decResult, error: decError } = await sbClient.rpc('decrement_ticket_count', { p_ticket_id: bookingTicket.id, p_amount: selectedMenu.ticket_cost });
+    if(decError || !decResult || !decResult.length){
+      await sbClient.from('bookings').update({status:'cancelled'}).eq('id', newBookingId);
+      btn.disabled=false; btn.textContent='この日時で予約を確定する';
+      alert('チケットの残数が不足しているため予約できませんでした。お手数ですが、最新の状態をご確認のうえもう一度お試しいただくか、スタッフまでお問い合わせください。');
+      return;
+    }
+    const {data: refreshed} = await sbClient.from('customers').select('*, tickets(*)').eq('id', currentCustomer.id).single();
+    if(refreshed){
+      currentCustomer = refreshed;
+      const todayStr = new Date().toISOString().slice(0,10);
+      currentTicket = refreshed.tickets?.find(t=>(!t.valid_from||t.valid_from<=todayStr)&&(!t.expires_at||t.expires_at>=todayStr)&&(t.plan_type==='unlimited'||t.remaining_count>0)) || refreshed.tickets?.[0] || null;
+    }
+  }
   if(newBookingId){
     // ★ 以前はここを待たずに完了画面へ進んでいたため、登録直後にキャンセルされるとgcal_event_idが
     //    未保存のままキャンセル処理が走り、カレンダーの予定が削除できず残ってしまう不具合があった。
@@ -818,16 +854,6 @@ async function submitBooking(){
     }catch(e){
       console.log('GCal error:',e);
       await sbClient.from('bookings').update({gcal_sync_error:'カレンダー登録時に通信エラーが発生しました'}).eq('id',newBookingId).catch(()=>{});
-    }
-  }
-  if(selectedMenu.ticket_cost>0 && bookingTicket && bookingTicket.plan_type!=='unlimited'){
-    const nr=bookingTicket.remaining_count-selectedMenu.ticket_cost;
-    await sbClient.from('tickets').update({remaining_count:nr}).eq('id',bookingTicket.id);
-    const {data: refreshed} = await sbClient.from('customers').select('*, tickets(*)').eq('id', currentCustomer.id).single();
-    if(refreshed){
-      currentCustomer = refreshed;
-      const todayStr = new Date().toISOString().slice(0,10);
-      currentTicket = refreshed.tickets?.find(t=>(!t.valid_from||t.valid_from<=todayStr)&&(!t.expires_at||t.expires_at>=todayStr)&&(t.plan_type==='unlimited'||t.remaining_count>0)) || refreshed.tickets?.[0] || null;
     }
   }
   const dn=['日','月','火','水','木','金','土'];
@@ -907,11 +933,8 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
       const diffH = (new Date(scheduledAt) - new Date()) / (1000 * 60 * 60);
       if(diffH >= 2 || useGraceQuota){
         const isCouponTicket = latestTicket.plan_type === 'coupon';
-        // ★ 回数券はtotal_countがnullなので上限なしで戻す、通常プランはtotal_count以内で戻す
-        const newRemaining = isCouponTicket
-          ? (latestTicket.remaining_count||0) + 1
-          : Math.min((latestTicket.remaining_count||0) + 1, latestTicket.total_count);
-        await sbClient.from('tickets').update({remaining_count: newRemaining}).eq('id', latestTicket.id);
+        // ★ 回数券はtotal_countがnullなので上限なし、通常プランはtotal_count以内で戻す（atomic RPC）
+        await sbClient.rpc('increment_ticket_count', { p_ticket_id: latestTicket.id, p_amount: 1, p_max: isCouponTicket ? null : latestTicket.total_count });
       }
     }
   }
