@@ -228,6 +228,14 @@
         <div class="card" style="padding:0;overflow-x:auto;"><div id="week-grid" style="min-width:700px;"></div></div>
       </div>
       <div id="booking-list-view" style="display:none;">
+        <div class="card" style="padding:14px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <label class="form-label" style="margin:0;">期間</label>
+          <input type="date" class="form-input" id="booking-list-start" style="width:auto;" onchange="loadBookingList()">
+          <span style="font-size:13px;color:#888;">〜</span>
+          <input type="date" class="form-input" id="booking-list-end" style="width:auto;" onchange="loadBookingList()">
+          <button class="btn btn-sm" onclick="resetBookingListRange()">今日以降に戻す</button>
+          <p style="font-size:12px;color:#888;margin:0 0 0 4px;">過去の日付を開始日に指定すると、過去の予約にも担当を設定できます。</p>
+        </div>
         <div class="card" style="padding:0;"><div id="booking-list"><div class="loading">読み込み中...</div></div></div>
       </div>
       <div id="booking-activity-view" style="display:none;">
@@ -433,12 +441,19 @@
           <button class="btn btn-danger" id="delete-expired-btn" style="display:none;" onclick="deleteExpiredTickets()">🗑 期限切れを一括削除する</button>
         </div>
       </div>
-      <!-- ★ チケット残数の整合性チェック -->
+      <!-- ★ 契約回数の超過チェック -->
       <div class="card">
-        <strong style="font-size:14px;display:block;margin-bottom:8px;">🔍 チケット残数の整合性チェック</strong>
-        <p style="font-size:13px;color:#888;margin-bottom:14px;line-height:1.7;">保存されているチケット残数と、実際の予約実績（確定・完了した予約の件数）から計算した残数を比較し、ズレているものを一覧表示します。<br>回数券・プレミアム（無制限）プランは手動管理のため対象外です。</p>
-        <button class="btn" onclick="checkTicketIntegrity()">🔍 確認する</button>
-        <div id="ticket-integrity-result" style="margin-top:12px;"></div>
+        <strong style="font-size:14px;display:block;margin-bottom:8px;">🔍 契約回数の超過チェック</strong>
+        <p style="font-size:13px;color:#888;margin-bottom:14px;line-height:1.7;">ライト・レギュラーのチケットについて、<strong>実際に確定している予約（セミパーソナルなどチケットを使う予約のみ）</strong>の件数が、契約回数を超えている会員を一覧表示します。自主トレなどチケットを使わない予約は数えません。<br>下段には、保存されている残数が実績とずれているチケットも参考として表示します（こちらは自動修正しません）。回数券・プレミアム（無制限）は対象外です。</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select class="form-input" id="overage-scope" style="width:auto;">
+            <option value="current">有効期限が今日以降のチケット</option>
+            <option value="recent">過去3か月分も含める</option>
+            <option value="all">すべて</option>
+          </select>
+          <button class="btn" onclick="checkTicketOverage()">🔍 確認する</button>
+        </div>
+        <div id="ticket-overage-result" style="margin-top:12px;"></div>
       </div>
     </div>
   </div>
@@ -875,11 +890,28 @@ function changeWeek(dir){currentWeekStart.setDate(currentWeekStart.getDate()+dir
 async function renderWeekCalendar(){if(!sbClient)return;if(!currentWeekStart)currentWeekStart=getWeekStart(new Date());const weekEnd=new Date(currentWeekStart);weekEnd.setDate(weekEnd.getDate()+6);weekEnd.setHours(23,59,59,999);const mn=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];document.getElementById('week-label').textContent=`${currentWeekStart.getFullYear()}年${mn[currentWeekStart.getMonth()]}${currentWeekStart.getDate()}日 〜 ${mn[weekEnd.getMonth()]}${weekEnd.getDate()}日`;const{data:bookings}=await sbClient.from('bookings').select('*, customers(name), menus(name,ticket_cost)').gte('scheduled_at',toLocalDateStr(currentWeekStart)+'T00:00:00').lte('scheduled_at',toLocalDateStr(weekEnd)+'T23:59:59').eq('status','confirmed').order('scheduled_at',{ascending:true});const dn=['日','月','火','水','木','金','土'];const days=[];for(let i=0;i<7;i++){const d=new Date(currentWeekStart);d.setDate(d.getDate()+i);days.push(d);}const today=new Date();today.setHours(0,0,0,0);let html='<div style="display:grid;grid-template-columns:56px repeat(7,1fr);border-bottom:2px solid #e8e8e8;"><div></div>';for(const d of days){const isToday=d.getTime()===today.getTime();const col=d.getDay()===0?'#e06060':d.getDay()===6?'#6090e0':'#333';html+=`<div style="padding:8px 4px;text-align:center;${isToday?'background:#f0fdf4;':''}"><div style="font-size:11px;color:${col};font-weight:600;">${dn[d.getDay()]}</div><div style="font-size:16px;font-weight:${isToday?'700':'500'};color:${isToday?'#06C755':col};">${d.getDate()}</div></div>`;}html+='</div><div style="display:grid;grid-template-columns:56px repeat(7,1fr);">';for(const slot of TIME_SLOTS){const[h]=slot.split(':');html+=`<div style="padding:6px 4px;font-size:11px;color:#aaa;text-align:right;border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;display:flex;align-items:flex-start;justify-content:flex-end;">${slot}</div>`;for(const d of days){const isToday=d.getTime()===today.getTime();const dayB=(bookings||[]).filter(b=>{const bd=new Date(b.scheduled_at);return bd.getFullYear()===d.getFullYear()&&bd.getMonth()===d.getMonth()&&bd.getDate()===d.getDate()&&bd.getHours()===parseInt(h);});let cellHtml='';for(const b of dayB){const tc=b.menus?.ticket_cost;const mk=tc>0?'A':b.menus?.name?.includes('体験')?'B':'C';const mc=MENU_COLORS[mk]||MENU_COLORS['A'];cellHtml+=`<div style="background:${mc.bg};border:1px solid ${mc.border};border-radius:6px;padding:2px 6px;font-size:11px;color:${mc.color};margin-bottom:2px;cursor:pointer;" onclick="showBookingDetail('${b.id}','${(b.customers?.name||'').replace(/'/g,'`')}','${b.menus?.name||''}','${b.scheduled_at}')"><span style="font-weight:600;">${b.customers?.name?.slice(0,4)||'—'}</span></div>`;}html+=`<div style="border-bottom:1px solid #f5f5f5;border-right:1px solid #f0f0f0;height:64px;padding:2px;${isToday?'background:#fafffe;':''}">${cellHtml}</div>`;}}html+='</div>';document.getElementById('week-grid').innerHTML=html;}
 function showBookingDetail(id,name,menu,scheduledAt){const dt=new Date(scheduledAt);const dn=['日','月','火','水','木','金','土'];const dtStr=`${dt.getMonth()+1}月${dt.getDate()}日（${dn[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;if(confirm(`【${name}】\n${menu}\n${dtStr}\n\nこの予約をキャンセルしますか？`))cancelBooking(id);}
 async function loadBookingList(){if(!sbClient)return;await ensureStaffLoaded();
-  // ★ 降順(未来が先)＋件数少なめだと、先の予約が多いと直近の予約が見えなくなるため、
-  //    「今日以降を直近順」に変更し、上限も広げた
-  const nowISO=new Date().toISOString();
-  const{data,error}=await sbClient.from('bookings').select('*, customers(name, line_picture_url), menus(name)').gte('scheduled_at',nowISO).order('scheduled_at',{ascending:true}).limit(200);
+  // ★ 件数少なめ＋今日以降固定だと直近の予約が見えなくなる問題を修正した際、過去分が一切見えなくなっていたため、
+  //    期間を自分で指定できるようにした（開始日を過去にすれば、過去の予約にも担当を設定できる）
+  const startInput=document.getElementById('booking-list-start');
+  const endInput=document.getElementById('booking-list-end');
+  if(startInput&&!startInput.value){
+    startInput.value=toLocalDateStr(new Date());
+    const end=new Date();end.setDate(end.getDate()+90);
+    endInput.value=toLocalDateStr(end);
+  }
+  const startDate=startInput.value;
+  const endDate=endInput.value;
+  let q=sbClient.from('bookings').select('*, customers(name, line_picture_url), menus(name)').order('scheduled_at',{ascending:true}).limit(500);
+  if(startDate)q=q.gte('scheduled_at',startDate+'T00:00:00');
+  if(endDate)q=q.lte('scheduled_at',endDate+'T23:59:59');
+  const{data,error}=await q;
   if(error||!data||!data.length){document.getElementById('booking-list').innerHTML='<div class="loading">予約がありません</div>';return;}let html='<table><thead><tr><th>日時</th><th>顧客</th><th>メニュー</th><th>担当</th><th>状態</th><th>操作</th></tr></thead><tbody>';for(const b of data){const dt=new Date(b.scheduled_at);const dtStr=`${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;const sm={confirmed:['確定','badge-green'],cancelled:['キャンセル','badge-red'],completed:['完了','badge-gray']};const[label,cls]=sm[b.status]||['—','badge-gray'];const syncBadge=b.gcal_sync_error?`<span class="badge badge-amber" title="${b.gcal_sync_error}" style="margin-left:4px;">⚠️カレンダー同期エラー</span>`:'';const staffOptions=`<option value="">未設定</option>`+allStaff.map(s=>`<option value="${s.id}" ${b.staff_id===s.id?'selected':''}>${s.name}</option>`).join('');html+=`<tr><td style="font-weight:600;">${dtStr}</td><td><div class="name-cell">${renderAvatar(b.customers||{name:'—'},26)}${b.customers?.name||'—'}</div></td><td>${b.menus?.name||'—'}</td><td><select class="form-input" style="font-size:12px;padding:4px 6px;" onchange="updateBookingStaff('${b.id}',this.value)">${staffOptions}</select></td><td><span class="badge ${cls}">${label}</span>${syncBadge}</td><td>${b.status==='confirmed'?`<button class="btn btn-sm btn-danger" onclick="cancelBooking('${b.id}')">キャンセル</button>`:'—'}</td></tr>`;}html+='</tbody></table>';document.getElementById('booking-list').innerHTML=html;}
+function resetBookingListRange(){
+  document.getElementById('booking-list-start').value=toLocalDateStr(new Date());
+  const end=new Date();end.setDate(end.getDate()+90);
+  document.getElementById('booking-list-end').value=toLocalDateStr(end);
+  loadBookingList();
+}
 async function updateBookingStaff(bookingId,staffId){const{error}=await sbClient.from('bookings').update({staff_id:staffId||null}).eq('id',bookingId);if(error){showToast('担当者の更新に失敗しました');return;}showToast('担当者を更新しました');}
 async function loadBookings(){if(!sbClient)return;currentWeekStart=getWeekStart(new Date());setBookingView('calendar');}
 async function cancelBooking(id){
@@ -1148,47 +1180,119 @@ async function deleteExpiredTickets(){
   showToast(`${data.length}件の期限切れチケットを削除しました`);
   await loadCustomers();
 }
-// ★ チケット残数の整合性チェック（保存されているremaining_countと、実際の予約実績から計算した値を比較）
-async function checkTicketIntegrity(){
-  const el=document.getElementById('ticket-integrity-result');
-  el.innerHTML='<div class="loading">確認中...</div>';
-  const{data:tickets,error:e1}=await sbClient.from('tickets').select('*, customers(name)').in('plan_type',['4','8']);
-  if(e1){el.innerHTML='<div class="loading">確認に失敗しました</div>';return;}
-  if(!tickets||!tickets.length){el.innerHTML='<div class="loading">対象のチケットがありません</div>';return;}
-  const ticketIds=tickets.map(t=>t.id);
-  const{data:bookings,error:e2}=await sbClient.from('bookings').select('ticket_id').in('ticket_id',ticketIds).in('status',['confirmed','completed']);
-  if(e2){el.innerHTML='<div class="loading">確認に失敗しました</div>';return;}
-  const consumedByTicket={};
+// ★ 契約回数の超過チェック
+//    ライト/レギュラーのチケットごとに「実際に確定している、チケットを使う予約」の件数を数え、契約回数を超えている会員を一覧にする。
+//    数え方は予約作成時のDB関数(create_booking_checked)と同じ：自主トレなどチケットを使わないメニューは数えない／
+//    管理画面から追加された予約(menu_idなし)でチケットを選んだものは1回分として数える。
+function escHtml(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function ticketBookingCost(b){
+  if(b.menu_id==null)return 1;
+  return Number(b.menus?.ticket_cost)||0;
+}
+function computeTicketUsage(tickets,bookings){
+  const byTicket={};
   for(const b of(bookings||[])){
     if(!b.ticket_id)continue;
-    consumedByTicket[b.ticket_id]=(consumedByTicket[b.ticket_id]||0)+1;
+    if(b.status!=='confirmed'&&b.status!=='completed')continue;
+    const cost=ticketBookingCost(b);
+    const u=(byTicket[b.ticket_id]=byTicket[b.ticket_id]||{used:0,list:[]});
+    u.used+=cost;
+    if(cost>0)u.list.push(b);
   }
-  const mismatches=[];
-  for(const t of tickets){
-    const consumed=consumedByTicket[t.id]||0;
-    const expected=Math.max(0,(t.total_count||0)-consumed);
-    if(expected!==t.remaining_count)mismatches.push({ticket:t,expected,consumed});
-  }
-  if(!mismatches.length){
-    el.innerHTML='<span style="color:#06C755;">✅ 不整合は見つかりませんでした</span>';
-    return;
-  }
-  let html=`<div style="background:#ffeaea;border-radius:8px;padding:10px 14px;margin-bottom:10px;"><strong style="color:#c0392b;">${mismatches.length}件のチケットで不整合が見つかりました</strong></div>`;
-  html+='<table><thead><tr><th>会員</th><th>プラン</th><th>期間</th><th>保存されている残数</th><th>予約実績からの想定残数</th><th>操作</th></tr></thead><tbody>';
-  for(const m of mismatches){
-    const t=m.ticket;
-    html+=`<tr><td>${t.customers?.name||'—'}</td><td>${PLAN_NAMES[t.plan_type]||t.plan_type}</td><td style="font-size:12px;color:#888;">${t.valid_from||'—'}〜${t.expires_at||'—'}</td><td style="font-weight:600;">${t.remaining_count}</td><td style="font-weight:600;color:#c0392b;">${m.expected}</td><td><button class="btn btn-sm btn-primary" onclick="fixTicketMismatch('${t.id}',${m.expected})">この数値に修正</button></td></tr>`;
-  }
-  html+='</tbody></table>';
-  el.innerHTML=html;
+  return(tickets||[])
+    .filter(t=>t.total_count!=null&&t.plan_type!=='unlimited'&&t.plan_type!=='coupon')
+    .map(t=>{
+      const u=byTicket[t.id]||{used:0,list:[]};
+      const list=[...u.list].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+      return{ticket:t,used:u.used,over:Math.max(0,u.used-t.total_count),expected:t.total_count-u.used,bookings:list};
+    });
 }
-async function fixTicketMismatch(ticketId,correctValue){
-  if(!confirm(`残数を ${correctValue} に修正しますか？`))return;
-  const{error}=await sbClient.from('tickets').update({remaining_count:correctValue}).eq('id',ticketId);
-  if(error){showToast('修正に失敗しました');return;}
-  showToast('修正しました');
-  await checkTicketIntegrity();
-  await loadCustomers();
+// 1回の取得上限(1000件)で結果が途中で切れないよう、ページを分けて全件取得する
+async function fetchAllPages(buildQuery){
+  const PAGE=1000;
+  let all=[];
+  for(let from=0;;from+=PAGE){
+    const{data,error}=await buildQuery().range(from,from+PAGE-1);
+    if(error)throw error;
+    all=all.concat(data||[]);
+    if(!data||data.length<PAGE)break;
+  }
+  return all;
+}
+let lastOverageRows=[];
+async function checkTicketOverage(){
+  const el=document.getElementById('ticket-overage-result');
+  el.innerHTML='<div class="loading">確認中...</div>';
+  try{
+    const scope=document.getElementById('overage-scope').value;
+    const today=new Date();
+    let minExpiry=null;
+    if(scope==='current')minExpiry=toLocalDateStr(today);
+    if(scope==='recent'){const d=new Date(today);d.setDate(d.getDate()-92);minExpiry=toLocalDateStr(d);}
+    const tickets=await fetchAllPages(()=>{
+      let q=sbClient.from('tickets').select('*, customers(name)').in('plan_type',['4','8']).order('id');
+      if(minExpiry)q=q.or(`expires_at.gte.${minExpiry},expires_at.is.null`);
+      return q;
+    });
+    if(!tickets.length){el.innerHTML='<div class="loading">対象のチケットがありません</div>';return;}
+    let bookings=[];
+    const ids=tickets.map(t=>t.id);
+    for(let i=0;i<ids.length;i+=50){
+      const chunk=ids.slice(i,i+50);
+      const rows=await fetchAllPages(()=>sbClient.from('bookings')
+        .select('id, ticket_id, status, menu_id, menu_name, scheduled_at, created_at, menus(ticket_cost, name)')
+        .in('ticket_id',chunk).in('status',['confirmed','completed']).order('id'));
+      bookings=bookings.concat(rows);
+    }
+    const usage=computeTicketUsage(tickets,bookings);
+    const over=usage.filter(u=>u.over>0).sort((a,b)=>b.over-a.over||String(b.ticket.valid_from||'').localeCompare(String(a.ticket.valid_from||'')));
+    const drift=usage.filter(u=>u.over===0&&u.ticket.remaining_count!==u.expected);
+    lastOverageRows=over;
+    const fmt=(iso)=>{if(!iso)return'—';const d=new Date(iso);const dn=['日','月','火','水','木','金','土'];return`${d.getMonth()+1}/${d.getDate()}（${dn[d.getDay()]}）${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;};
+    let html=`<p style="font-size:12px;color:#888;margin-bottom:10px;">確認したチケット：${usage.length}件</p>`;
+    if(!over.length){
+      html+='<div style="background:#e8f9ef;border-radius:8px;padding:10px 14px;margin-bottom:10px;color:#0a7a4a;font-weight:600;">✅ 契約回数を超えている会員は見つかりませんでした</div>';
+    } else {
+      html+=`<div style="background:#ffeaea;border-radius:8px;padding:10px 14px;margin-bottom:10px;"><strong style="color:#c0392b;">契約回数を超えているチケット：${over.length}件</strong></div>`;
+      html+='<table><thead><tr><th>会員</th><th>プラン</th><th>期間</th><th>契約回数</th><th>確定している予約</th><th>超過</th><th>保存されている残数</th><th>操作</th></tr></thead><tbody>';
+      over.forEach((u,i)=>{
+        const t=u.ticket;
+        html+=`<tr><td style="font-weight:600;">${escHtml(t.customers?.name||'—')}</td><td>${escHtml(PLAN_NAMES[t.plan_type]||t.plan_type)}</td><td style="font-size:12px;color:#888;">${escHtml(t.valid_from||'—')}〜${escHtml(t.expires_at||'—')}</td><td>${t.total_count}</td><td style="font-weight:600;">${u.used}</td><td><span class="badge badge-red">＋${u.over}</span></td><td>${t.remaining_count}</td><td style="white-space:nowrap;"><button class="btn btn-sm" onclick="toggleOverageDetail(${i})">予約を見る</button> <button class="btn btn-sm" onclick="openOverageClient(${i})">会員を開く</button></td></tr>`;
+        html+=`<tr id="overage-detail-${i}" style="display:none;"><td colspan="8" style="background:#fafafa;padding:10px 14px;"><div style="font-size:12px;color:#888;margin-bottom:6px;">チケットを使う確定予約（予約が作られた日時が新しい順）。あとから入った予約ほど、超過の原因になった可能性が高いです。振替など意図的に入れたものでなければ、顧客詳細の予約履歴から該当の予約をキャンセルしてください。</div>`;
+        html+='<table><thead><tr><th>予約日時</th><th>メニュー</th><th>状態</th><th>予約が作られた日時</th></tr></thead><tbody>';
+        for(const b of u.bookings){
+          html+=`<tr><td style="font-weight:600;">${fmt(b.scheduled_at)}</td><td>${escHtml(b.menus?.name||b.menu_name||'（管理画面から追加）')}</td><td>${b.status==='completed'?'完了':'確定'}</td><td style="color:#888;">${fmt(b.created_at)}</td></tr>`;
+        }
+        html+='</tbody></table></td></tr>';
+      });
+      html+='</tbody></table>';
+    }
+    if(drift.length){
+      html+=`<div style="margin-top:18px;font-size:13px;font-weight:600;">参考：保存されている残数が、予約実績とずれているチケット（${drift.length}件）</div>`;
+      html+='<p style="font-size:12px;color:#888;margin:4px 0 8px;line-height:1.6;">直前キャンセルで正しくチケットが消化された場合や、管理画面での手動調整でも差は出ます。差があるだけでは誤りとは限らないため、自動修正はしません。直す場合は、顧客詳細のチケット欄の＋1／−1で調整してください。</p>';
+      html+='<table><thead><tr><th>会員</th><th>プラン</th><th>期間</th><th>保存されている残数</th><th>実績からの想定残数</th></tr></thead><tbody>';
+      for(const u of drift){
+        const t=u.ticket;
+        html+=`<tr><td>${escHtml(t.customers?.name||'—')}</td><td>${escHtml(PLAN_NAMES[t.plan_type]||t.plan_type)}</td><td style="font-size:12px;color:#888;">${escHtml(t.valid_from||'—')}〜${escHtml(t.expires_at||'—')}</td><td style="font-weight:600;">${t.remaining_count}</td><td style="font-weight:600;">${u.expected}</td></tr>`;
+      }
+      html+='</tbody></table>';
+    }
+    el.innerHTML=html;
+  }catch(e){
+    console.log('checkTicketOverage error:',e);
+    el.innerHTML='<div class="loading">確認に失敗しました（通信状況をご確認のうえ、もう一度お試しください）</div>';
+  }
+}
+function toggleOverageDetail(i){
+  const row=document.getElementById('overage-detail-'+i);
+  if(row)row.style.display=row.style.display==='none'?'':'none';
+}
+function openOverageClient(i){
+  const u=lastOverageRows[i];
+  if(!u)return;
+  document.getElementById('client-search').value=u.ticket.customers?.name||'';
+  showPage('clients',document.querySelector('nav a:nth-child(2)'));
+  setBottomNav('bn-clients');
 }
 async function toggleBlockClient(id,name,isBlocked){const msg=isBlocked?`${name} さんのブロックを解除しますか？`:`${name} さんをブロックしますか？\n全メニューの予約ができなくなります。`;if(!confirm(msg))return;const{error}=await sbClient.from('customers').update({is_blocked:!isBlocked}).eq('id',id);if(error){showToast('更新に失敗しました');return;}showToast(isBlocked?'ブロックを解除しました':`${name} さんをブロックしました`);await loadCustomers();}
 // ★ 個別の同時保持予約数上限（プラン設定より優先）
