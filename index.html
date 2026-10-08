@@ -640,6 +640,50 @@ function renderConfirm(){
   const warnEl = document.getElementById('confirm-warn-cancel');
   if(warnEl) warnEl.style.display = (selectedMenu.ticket_cost>0 && !isUnlimitedTicket) ? '' : 'none';
 }
+// ★ 予約の作成とチケットの判定を、DB側の関数(create_booking_checked)1回でまとめて行う。
+//    戻り値：
+//      {status:'ok', bookingId, remaining}      … 予約完了
+//      {status:'rejected', reason, detail}      … 契約回数・残数などのルールにより明確に断られた
+//      {status:'fallback', cause}               … 関数の不具合・通信エラーなど（会員を締め出さないため従来方式で続行する）
+async function tryCreateBookingChecked(client, p){
+  try{
+    const { data, error } = await client.rpc('create_booking_checked', {
+      p_customer_id: p.customerId,
+      p_ticket_id: p.ticketId,
+      p_menu_id: p.menuId,
+      p_menu_name: p.menuName,
+      p_scheduled_at: p.scheduledAt,
+      p_duration_minutes: p.durationMinutes
+    });
+    if(error || !data || typeof data !== 'object') return { status:'fallback', cause: error || 'empty-response' };
+    if(data.ok === true && data.booking_id){
+      return { status:'ok', bookingId: data.booking_id, remaining: (data.remaining_count ?? null) };
+    }
+    if(data.ok === false && (data.reason === 'limit_reached' || data.reason === 'no_balance' || data.reason === 'no_ticket')){
+      return { status:'rejected', reason: data.reason, detail: data };
+    }
+    return { status:'fallback', cause: data };
+  }catch(e){
+    return { status:'fallback', cause: e };
+  }
+}
+function bookingRejectMessage(reason, detail){
+  if(reason === 'limit_reached'){
+    return `ご契約回数（${detail?.total_count ?? ''}回）分の予約がすでに入っているため、これ以上予約できません。\nご予約の変更をご希望の場合は、既存の予約をキャンセルしてからお願いします。`;
+  }
+  if(reason === 'no_balance'){
+    return 'チケットの残数が足りないため予約できませんでした。\n画面を開き直すと最新の残数が表示されます。ご不明な点はスタッフまでお問い合わせください。';
+  }
+  return 'ご利用可能なチケットが見つからないため予約できませんでした。\nスタッフまでお問い合わせください。';
+}
+async function refreshCurrentCustomer(){
+  const {data: refreshed} = await sbClient.from('customers').select('*, tickets(*)').eq('id', currentCustomer.id).single();
+  if(refreshed){
+    currentCustomer = refreshed;
+    const todayStr = new Date().toISOString().slice(0,10);
+    currentTicket = refreshed.tickets?.find(t=>(!t.valid_from||t.valid_from<=todayStr)&&(!t.expires_at||t.expires_at>=todayStr)&&(t.plan_type==='unlimited'||t.remaining_count>0)) || refreshed.tickets?.[0] || null;
+  }
+}
 async function submitBooking(){
   // ★ 連打・多重送信ガード：ボタンのdisabled化が間に合わない一瞬の連打でも、
   //    同じ予約リクエストが複数同時に飛ぶのを確実に防ぐ
@@ -819,33 +863,61 @@ async function submitBookingInner(){
   const [h,m]=selectedTime.split(':');
   const dt=new Date(selectedDate);
   dt.setHours(parseInt(h),parseInt(m),0,0);
-  const {data:newBooking, error}=await sbClient.from('bookings').insert({
-    customer_id:currentCustomer.id,
-    ticket_id:bookingTicket?.id||null,
-    menu_id:selectedMenu.id,
-    menu_name:selectedMenu.name,
-    scheduled_at:dt.toISOString(),
-    duration_minutes:selectedMenu.duration_minutes,
-    status:'confirmed'
-  }).select('id').single();
-  if(error){btn.disabled=false;btn.textContent='この日時で予約を確定する';alert('予約に失敗しました。もう一度お試しください。');return;}
-  const newBookingId = newBooking?.id;
-  // ★ チケット消化は「読み取って-1して書き込む」方式だと、同時に複数の予約が走った際に
-  //    更新が競合して残数チェックをすり抜けてしまう不具合があったため、DB側で確実に1件ずつ処理される
-  //    atomic RPC（decrement_ticket_count）に変更。残数が足りない場合は予約自体を取り消す。
-  if(selectedMenu.ticket_cost>0 && bookingTicket && bookingTicket.plan_type!=='unlimited'){
-    const { data: decResult, error: decError } = await sbClient.rpc('decrement_ticket_count', { p_ticket_id: bookingTicket.id, p_amount: selectedMenu.ticket_cost });
-    if(decError || !decResult || !decResult.length){
-      await sbClient.from('bookings').update({status:'cancelled'}).eq('id', newBookingId);
-      btn.disabled=false; btn.textContent='この日時で予約を確定する';
-      alert('チケットの残数が不足しているため予約できませんでした。お手数ですが、最新の状態をご確認のうえもう一度お試しいただくか、スタッフまでお問い合わせください。');
-      return;
-    }
-    const {data: refreshed} = await sbClient.from('customers').select('*, tickets(*)').eq('id', currentCustomer.id).single();
-    if(refreshed){
-      currentCustomer = refreshed;
-      const todayStr = new Date().toISOString().slice(0,10);
-      currentTicket = refreshed.tickets?.find(t=>(!t.valid_from||t.valid_from<=todayStr)&&(!t.expires_at||t.expires_at>=todayStr)&&(t.plan_type==='unlimited'||t.remaining_count>0)) || refreshed.tickets?.[0] || null;
+  // ★ 予約の作成＋チケットの判定を、DB側の関数1回で行う（同じチケットへの同時予約は1件ずつ順番に処理され、
+  //    残数カウンターに加えて「実際の確定予約数」も数えるため、契約回数を超える予約は通らない）。
+  let newBookingId = null;
+  let remainingAfter = null; // 予約後の残数（分かる場合のみ。完了画面の表示用）
+  const created = await tryCreateBookingChecked(sbClient, {
+    customerId: currentCustomer.id,
+    ticketId: bookingTicket?.id || null,
+    menuId: selectedMenu.id,
+    menuName: selectedMenu.name,
+    scheduledAt: dt.toISOString(),
+    durationMinutes: selectedMenu.duration_minutes
+  });
+  if(created.status === 'ok'){
+    newBookingId = created.bookingId;
+    remainingAfter = created.remaining;
+    await refreshCurrentCustomer();
+  } else if(created.status === 'rejected'){
+    // 契約回数・残数のルールで断られた場合のみ、予約を中止する（予約データは作られていない）
+    await refreshCurrentCustomer();
+    btn.disabled=false; btn.textContent='この日時で予約を確定する';
+    alert(bookingRejectMessage(created.reason, created.detail));
+    return;
+  } else {
+    // 関数が使えない（不具合・通信エラーなど）場合は、会員を締め出さないよう従来方式で予約を続行する
+    console.log('create_booking_checked unavailable, falling back to legacy flow:', created.cause);
+    // 通信エラーで「登録は成功したが応答が届かなかった」場合に二重登録しないよう、直近の同じ予約が無いか確認
+    const { data: justCreated } = await sbClient.from('bookings').select('id')
+      .eq('customer_id', currentCustomer.id).eq('scheduled_at', dt.toISOString()).eq('status','confirmed')
+      .gte('created_at', new Date(Date.now() - 120000).toISOString()).limit(1);
+    if(justCreated && justCreated.length){
+      newBookingId = justCreated[0].id;
+      await refreshCurrentCustomer();
+    } else {
+      const {data:newBooking, error}=await sbClient.from('bookings').insert({
+        customer_id:currentCustomer.id,
+        ticket_id:bookingTicket?.id||null,
+        menu_id:selectedMenu.id,
+        menu_name:selectedMenu.name,
+        scheduled_at:dt.toISOString(),
+        duration_minutes:selectedMenu.duration_minutes,
+        status:'confirmed'
+      }).select('id').single();
+      if(error){btn.disabled=false;btn.textContent='この日時で予約を確定する';alert('予約に失敗しました。もう一度お試しください。');return;}
+      newBookingId = newBooking?.id;
+      if(selectedMenu.ticket_cost>0 && bookingTicket && bookingTicket.plan_type!=='unlimited'){
+        const { data: decResult, error: decError } = await sbClient.rpc('decrement_ticket_count', { p_ticket_id: bookingTicket.id, p_amount: selectedMenu.ticket_cost });
+        if(decError || !decResult || !decResult.length){
+          await sbClient.from('bookings').update({status:'cancelled'}).eq('id', newBookingId);
+          btn.disabled=false; btn.textContent='この日時で予約を確定する';
+          alert('チケットの残数が不足しているため予約できませんでした。お手数ですが、最新の状態をご確認のうえもう一度お試しいただくか、スタッフまでお問い合わせください。');
+          return;
+        }
+        remainingAfter = bookingTicket.remaining_count - selectedMenu.ticket_cost;
+        await refreshCurrentCustomer();
+      }
     }
   }
   if(newBookingId){
@@ -873,7 +945,8 @@ async function submitBookingInner(){
   const dtStr=`${d.getMonth()+1}月${d.getDate()}日（${dn[d.getDay()]}）${selectedTime}`;
   document.getElementById('done-menu').textContent=selectedMenu.name;
   document.getElementById('done-datetime').textContent=dtStr;
-  document.getElementById('done-remaining').textContent=bookingTicket?(bookingTicket.plan_type==='unlimited'?'無制限':bookingTicket.remaining_count+'回'):'—';
+  // ★ 予約後の残数を表示（以前は予約前の古い値が出ていた）
+  document.getElementById('done-remaining').textContent=bookingTicket?(bookingTicket.plan_type==='unlimited'?'無制限':((remainingAfter!=null?remainingAfter:bookingTicket.remaining_count)+'回')):'—';
   try {
     fetch('https://script.google.com/macros/s/AKfycbw7kg1hfBcn8Hhrwu4DKxh43rAiGd1bSXoUmJM1LEYlS7AxGGrepQpjSCdABDkYzC7aJA/exec', {
       method: 'POST',
@@ -901,7 +974,18 @@ async function loadMyBookings(){
   el.innerHTML=data.map(b=>{const dt=new Date(b.scheduled_at);const isPast=dt<new Date();return`<div class="history-item" style="margin-top:8px;"><div class="history-date">${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日（${dn[dt.getDay()]}）${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}</div><div class="history-title">${b.menu_name||'セミパーソナル60分'}</div><span class="history-badge">確定</span>${!isPast?`<button style="float:right;background:none;border:1px solid #f5c6c6;border-radius:6px;padding:3px 10px;font-size:11px;color:#e74c3c;cursor:pointer;margin-top:4px;" onclick="cancelBooking('${b.id}','${b.ticket_id}','${b.scheduled_at}',${b.menus?.ticket_cost||0})">キャンセル</button>`:''}</div>`;}).join('');
 }
 const MONTHLY_FREE_LATE_CANCELS = 2;
+// ★ キャンセルの連打・二重操作ガード（同じ予約のキャンセルが同時に2回走ると、残数が2回戻ってしまうため）
+const cancellingBookingIds = new Set();
 async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
+  if(cancellingBookingIds.has(id)) return;
+  cancellingBookingIds.add(id);
+  try{
+    await cancelBookingInner(id,ticketId,scheduledAt,menuTicketCost);
+  } finally {
+    cancellingBookingIds.delete(id);
+  }
+}
+async function cancelBookingInner(id,ticketId,scheduledAt,menuTicketCost){
   const now = new Date();
   const scheduled = new Date(scheduledAt);
   const diffHours = (scheduled - now) / (1000 * 60 * 60);
@@ -924,6 +1008,28 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
     if(!confirm('この予約をキャンセルしますか？'))return;
   }
   const {data:booking}=await sbClient.from('bookings').select('*,menus(ticket_cost),gcal_event_id').eq('id',id).single();
+  // ★ すでにキャンセル済み（古い画面からの操作など）なら何もしない。残数を二重に戻さないため。
+  if(!booking || booking.status !== 'confirmed'){
+    alert('この予約はすでにキャンセル済みです。');
+    await loadCustomer();
+    await loadMyBookings();
+    return;
+  }
+  // ★ 「確定→キャンセル」への変更を、成功するのが1回だけになる条件付き更新で確保する。
+  //    更新に成功した場合だけ、カレンダー削除と残数の返却を行う（同時に2回走っても返却は1回だけ）。
+  const {data:claimed, error:claimError}=await sbClient.from('bookings')
+    .update({status:'cancelled', cancelled_at: now.toISOString(), late_cancel_forgiven: useGraceQuota})
+    .eq('id',id).eq('status','confirmed').select('id');
+  if(claimError){
+    alert('キャンセルに失敗しました。お手数ですが、もう一度お試しいただくか、スタッフまでお問い合わせください。');
+    return;
+  }
+  if(!claimed || !claimed.length){
+    alert('この予約はすでにキャンセル済みです。');
+    await loadCustomer();
+    await loadMyBookings();
+    return;
+  }
   let gcalSyncError=null;
   if(booking?.gcal_event_id){
     try{
@@ -937,8 +1043,10 @@ async function cancelBooking(id,ticketId,scheduledAt,menuTicketCost){
       console.log('GCal delete error:',e);
       gcalSyncError='カレンダー削除に失敗しました（通信エラー）';
     }
+    if(gcalSyncError){
+      await sbClient.from('bookings').update({gcal_sync_error: gcalSyncError}).eq('id',id);
+    }
   }
-  await sbClient.from('bookings').update({status:'cancelled', cancelled_at: now.toISOString(), late_cancel_forgiven: useGraceQuota, gcal_sync_error: gcalSyncError}).eq('id',id);
   if(booking?.ticket_id){
     const {data:latestTicket} = await sbClient.from('tickets').select('*').eq('id',booking.ticket_id).single();
     if(latestTicket && latestTicket.plan_type !== 'unlimited'){
