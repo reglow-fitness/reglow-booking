@@ -1047,14 +1047,18 @@ async function cancelBookingInner(id,ticketId,scheduledAt,menuTicketCost){
       await sbClient.from('bookings').update({gcal_sync_error: gcalSyncError}).eq('id',id);
     }
   }
-  if(booking?.ticket_id){
+  // ★ 返すのは「その予約が実際に消費した回数」だけ。自主トレなどチケットを使わない予約(ticket_cost=0)は、
+  //    チケットが紐づいていても何も消費していないので返却しない（以前は1回戻していたため、残数が実際より多くなっていた）。
+  //    メニューなしの予約（管理画面から追加）は、チケットを選んでいれば1回消費として扱う。
+  const refundCost = booking?.menu_id == null ? 1 : (Number(booking?.menus?.ticket_cost) || 0);
+  if(booking?.ticket_id && refundCost > 0){
     const {data:latestTicket} = await sbClient.from('tickets').select('*').eq('id',booking.ticket_id).single();
     if(latestTicket && latestTicket.plan_type !== 'unlimited'){
       const diffH = (new Date(scheduledAt) - new Date()) / (1000 * 60 * 60);
       if(diffH >= 2 || useGraceQuota){
         const isCouponTicket = latestTicket.plan_type === 'coupon';
         // ★ 回数券はtotal_countがnullなので上限なし、通常プランはtotal_count以内で戻す（atomic RPC）
-        await sbClient.rpc('increment_ticket_count', { p_ticket_id: latestTicket.id, p_amount: 1, p_max: isCouponTicket ? null : latestTicket.total_count });
+        await sbClient.rpc('increment_ticket_count', { p_ticket_id: latestTicket.id, p_amount: refundCost, p_max: isCouponTicket ? null : latestTicket.total_count });
       }
     }
   }
