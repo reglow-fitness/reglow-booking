@@ -239,6 +239,21 @@ let lineProfile = null;
 let currentCustomer = null;
 let currentTicket = null;
 let selectedMenu = null;
+// ★ 予約の受付締切（開始の何分前まで予約できるか）。変更したい時はここの数字だけ変えればOK
+const LEAD_MINUTES_SEMI = 60;        // 通常予約（セミパーソナル）：1時間前まで
+const LEAD_MINUTES_JISHU = 0;        // 自主トレ：開始直前まで
+const LEAD_MINUTES_TAIKEN = 12 * 60; // 体験：12時間前まで
+function bookingLeadMinutes(menu){
+  if(!menu) return LEAD_MINUTES_SEMI;
+  if(menu.ticket_cost > 0) return LEAD_MINUTES_SEMI;
+  if((menu.name||'').includes('体験') || menu.max_per_slot === 1) return LEAD_MINUTES_TAIKEN;
+  return LEAD_MINUTES_JISHU;
+}
+function bookingDeadlineText(menu){
+  const m = bookingLeadMinutes(menu);
+  if(m <= 0) return '開始直前';
+  return m % 60 === 0 ? `${m/60}時間前` : `${m}分前`;
+}
 let selectedDate = null;
 let selectedTime = null;
 let calYear, calMonth;
@@ -547,7 +562,8 @@ async function renderTimeSlots(ds) {
   }
   const baseSlots = availableSlots && availableSlots.length > 0 ? availableSlots : [];
   // ★ 過去の時間帯（今日の場合、現在時刻より前の枠）を予約対象から除外
-  const nowForFilter = new Date();
+  // ★ メニューごとの受付締切（通常=1時間前／自主トレ=直前／体験=12時間前）を過ぎた枠も除外
+  const nowForFilter = new Date(Date.now() + bookingLeadMinutes(selectedMenu) * 60000);
   const activeSlots = baseSlots.filter(s => !blockedSlots.includes(s) && new Date(ds+'T'+s+':00') > nowForFilter);
   let html = '';
   for(const slot of activeSlots){
@@ -703,9 +719,12 @@ async function submitBookingInner(){
     const [ch0, cm0] = selectedTime.split(':');
     const checkDt = new Date(selectedDate);
     checkDt.setHours(parseInt(ch0), parseInt(cm0), 0, 0);
-    if(checkDt <= new Date()){
+    const leadMin = bookingLeadMinutes(selectedMenu);
+    if(checkDt <= new Date(Date.now() + leadMin * 60000)){
       btn.disabled=false; btn.textContent='この日時で予約を確定する';
-      alert('選択した日時はすでに過ぎています。お手数ですが、日時を選び直してください。');
+      alert(leadMin > 0
+        ? `この日時は受付を締め切りました（${selectedMenu.name}は開始の${bookingDeadlineText(selectedMenu)}までのご予約です）。お手数ですが、日時を選び直してください。`
+        : '選択した日時はすでに過ぎています。お手数ですが、日時を選び直してください。');
       goScreen('screen-calendar');
       return;
     }
