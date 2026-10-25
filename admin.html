@@ -336,11 +336,8 @@
         <div id="session-report-summary"><div class="loading">対象月を選んで「集計する」を押してください</div></div>
       </div>
       <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
-          <strong style="font-size:14px;">個別の申請一覧（追加・訂正・削除）</strong>
-          <button class="btn btn-primary btn-sm" onclick="openSessionReportModal()">＋ 申請を追加</button>
-        </div>
-        <p style="font-size:12px;color:#888;margin-bottom:14px;">スタッフの付け忘れ分の追加や、日付・時間・スタッフ・人数の書き換えがここからできます。管理画面にログインしている時だけ操作でき、スタッフ側からは過去分は触れません。</p>
+        <strong style="font-size:14px;display:block;margin-bottom:4px;">個別の申請一覧（訂正・削除）</strong>
+        <p style="font-size:12px;color:#888;margin-bottom:14px;">スタッフの入力ミスなどをここから直接修正・削除できます（管理者ログイン中は日付に関わらず操作できます）。</p>
         <div id="session-report-detail"><div class="loading">対象月を選んで「集計する」を押してください</div></div>
       </div>
     </div>
@@ -444,6 +441,23 @@
           <button class="btn btn-danger" id="delete-expired-btn" style="display:none;" onclick="deleteExpiredTickets()">🗑 期限切れを一括削除する</button>
         </div>
       </div>
+      <!-- ★ 予約ルール（プラン別の同時保持上限・直前の空き解放） -->
+      <div class="card">
+        <strong style="font-size:14px;display:block;margin-bottom:8px;">🎛 予約ルール（同時に保持できる予約数）</strong>
+        <p style="font-size:13px;color:#888;margin-bottom:14px;line-height:1.7;">プランごとに「今から先の確定済みセミパーソナルを何件まで持てるか」を設定します。自主トレ・体験は数えません。空欄にするとそのプランは制限なしです。<br>会員ごとの個別上限（顧客の詳細画面）を設定している会員は、そちらが優先されます。回数券には標準値はありません。</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;">
+          <div><label class="form-label">ライト（件）</label><input class="form-input" id="rule-light" type="number" min="1" placeholder="制限なし"></div>
+          <div><label class="form-label">レギュラー（件）</label><input class="form-input" id="rule-regular" type="number" min="1" placeholder="制限なし"></div>
+          <div><label class="form-label">プレミアム（件）</label><input class="form-input" id="rule-premium" type="number" min="1" placeholder="制限なし"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px;">
+          <div><label class="form-label">適用開始日（この日以降の予約分から）</label><input class="form-input" id="rule-start" type="date"></div>
+          <div><label class="form-label">直前の空き解放（開始の何時間前以内か）</label><input class="form-input" id="rule-release" type="number" min="0" step="0.5" placeholder="3"></div>
+        </div>
+        <p style="font-size:12px;color:#888;margin-bottom:12px;line-height:1.7;">※解放：開始まで上の時間以内になった枠は、空いていれば上限（プラン別・個別・スタッフ枠）に関係なくどなたでも予約できます。0にすると解放しません。<br>※適用開始日より前の日付の予約には、プラン別の上限はかかりません（個別上限は従来どおり常に有効です）。</p>
+        <button class="btn btn-primary" onclick="saveBookingRules()">保存する</button>
+        <span id="rule-status" style="margin-left:10px;font-size:13px;color:#06C755;"></span>
+      </div>
       <!-- ★ 契約回数の超過チェック -->
       <div class="card">
         <strong style="font-size:14px;display:block;margin-bottom:8px;">🔍 契約回数の超過チェック</strong>
@@ -541,17 +555,6 @@
     <div class="modal-footer"><button class="btn" onclick="closeModal('modal-add-booking')">キャンセル</button><button class="btn btn-primary" onclick="addBooking()">予約を追加</button></div>
   </div>
 </div>
-<div class="modal-overlay" id="modal-session-report" onclick="closeModalOutside(event,'modal-session-report')">
-  <div class="modal">
-    <div class="modal-title" id="session-report-modal-title">申請を追加</div>
-    <input type="hidden" id="sr-edit-id">
-    <div class="form-row"><label class="form-label">日付 *</label><input type="date" class="form-input" id="sr-date"></div>
-    <div class="form-row"><label class="form-label">時間 *</label><select class="form-input" id="sr-time"></select></div>
-    <div class="form-row"><label class="form-label">スタッフ *</label><select class="form-input" id="sr-staff"></select></div>
-    <div class="form-row"><label class="form-label">対応人数 *</label><select class="form-input" id="sr-category"><option value="1">1人対応</option><option value="2">2人対応</option><option value="3">3人対応</option><option value="0">なし</option></select></div>
-    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-session-report')">キャンセル</button><button class="btn btn-primary" onclick="saveSessionReportModal()">保存する</button></div>
-  </div>
-</div>
 <div class="modal-overlay" id="modal-edit-name" onclick="closeModalOutside(event,'modal-edit-name')">
   <div class="modal">
     <div class="modal-title">顧客名を変更</div>
@@ -587,7 +590,7 @@ function isCoupon(planType){return planType==='coupon';}
 function setBottomNav(id){document.querySelectorAll('.bottom-nav-item').forEach(e=>e.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');}
 function initSupabase(){const url=document.getElementById('setting-url').value.trim()||'https://plapbyvgthymszrzbsgl.supabase.co';const key=document.getElementById('setting-key').value.trim()||'sb_publishable_-FVZ_yzggmRe8cTv4oGXJg_4zqIZEIc';if(url&&key){sbClient=window.supabase.createClient(url,key);return true;}return false;}
 function saveSettings(){const url=document.getElementById('setting-url').value.trim();const key=document.getElementById('setting-key').value.trim();if(!url||!key){showToast('URLとキーを入力してください');return;}sbClient=window.supabase.createClient(url,key);document.getElementById('setting-status').textContent='✅ 接続しました！';showToast('接続しました！');showPage('dashboard',null);setBottomNav('bn-dashboard');loadAll();}
-function showPage(name,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');if(el&&el.tagName==='A')el.classList.add('active');if(name==='clients')renderClients();if(name==='bookings')loadBookings();if(name==='dashboard')loadDashboard();if(name==='slots')initSlotWeek();if(name==='staffmanage')loadStaffManage();if(name==='sessionreports')initSessionReportsPage();if(name==='dependency')initDependencyPage();if(name==='tendency')initTendencyPage();}
+function showPage(name,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');if(el&&el.tagName==='A')el.classList.add('active');if(name==='clients')renderClients();if(name==='bookings')loadBookings();if(name==='dashboard')loadDashboard();if(name==='slots')initSlotWeek();if(name==='staffmanage')loadStaffManage();if(name==='sessionreports')initSessionReportsPage();if(name==='dependency')initDependencyPage();if(name==='tendency')initTendencyPage();if(name==='settings')loadBookingRulesForm();}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
@@ -745,6 +748,14 @@ async function buildPanelHTML(customerId){
     tHtml += `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px 4px 0;border-top:1px solid #eef8f3;font-size:12px;color:#555;">
       <span>🔢 同時に保持できる予約数の上限</span>
       <span>${limitDisplay} <button class="btn btn-sm" style="margin-left:6px;" onclick="editConcurrentLimit('${customerId}','${customerObj.name.replace(/'/g,"\\'")}',${customerObj.concurrent_booking_limit??'null'})">設定</button></span>
+    </div>`;
+    // ★ 特定スタッフ枠の月間上限（任意の会員のみ）
+    const staffLimitDisplay = (customerObj.staff_limit_name && customerObj.staff_limit_monthly!=null)
+      ? `<span class="badge badge-purple">${escHtml(customerObj.staff_limit_name)} 月${customerObj.staff_limit_monthly}回まで</span>`
+      : `<span style="color:#aaa;">制限なし</span>`;
+    tHtml += `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding:6px 4px 0;font-size:12px;color:#555;">
+      <span>⭐ 特定スタッフ枠の月間上限</span>
+      <span>${staffLimitDisplay} <button class="btn btn-sm" style="margin-left:6px;" onclick="editStaffLimit('${customerId}','${customerObj.name.replace(/'/g,"\\'")}')">設定</button></span>
     </div>`;
   }
   // ★ 予約履歴は「直近20件」だと予約頻度の高い会員で古い月が丸ごと見えなくなるため、月ごとにグルーピング。
@@ -1024,7 +1035,7 @@ async function loadWeeklyDay(day,el){if(!sbClient)initSupabase();if(!sbClient){s
   let thtml='';
   for(const slot of DEFAULT_SLOTS){
     const cur=taikenMaxPerSlot[slot]||0;
-    thtml+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${slot}</span><select class="form-input weekly-taiken-select" data-slot="${slot}" style="width:140px;"><option value="0" ${cur==0?'selected':''}>体験枠なし</option><option value="1" ${cur==1?'selected':''}>体験枠あり（1枠）</option></select></div>`;
+    thtml+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${slot}</span><select class="form-input weekly-taiken-select" data-slot="${slot}" style="width:270px;"><option value="0" ${cur==0?'selected':''}>従来どおり（セミ予約がなければ体験OK）</option><option value="1" ${cur==1?'selected':''}>体験枠あり（1枠）</option><option value="-1" ${cur<0?'selected':''}>体験は受け付けない</option></select></div>`;
   }
   document.getElementById('weekly-taiken-per-slot').innerHTML=thtml;
   // ★ 担当スタッフUI（時間帯ごと・複数人可・チェックボックス）
@@ -1045,7 +1056,7 @@ async function loadSlotSetting(){if(!sbClient)initSupabase();if(!sbClient){showT
   let thtml2='';
   for(const slot of DEFAULT_SLOTS){
     const cur=taikenMaxPerSlot2[slot]||0;
-    thtml2+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${slot}</span><select class="form-input slot-taiken-select" data-slot="${slot}" style="width:140px;"><option value="0" ${cur==0?'selected':''}>体験枠なし</option><option value="1" ${cur==1?'selected':''}>体験枠あり（1枠）</option></select></div>`;
+    thtml2+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:13px;width:60px;">${slot}</span><select class="form-input slot-taiken-select" data-slot="${slot}" style="width:270px;"><option value="0" ${cur==0?'selected':''}>従来どおり（セミ予約がなければ体験OK）</option><option value="1" ${cur==1?'selected':''}>体験枠あり（1枠）</option><option value="-1" ${cur<0?'selected':''}>体験は受け付けない</option></select></div>`;
   }
   document.getElementById('slot-taiken-per-slot').innerHTML=thtml2;
   // ★ 担当スタッフUI（時間帯ごと・複数人可・チェックボックス）。未設定の場合は同曜日の週間テンプレートの値を初期値として表示
@@ -1325,6 +1336,63 @@ async function editConcurrentLimit(id,name,current){
   showToast(newValue?`${name} さんの予約上限を${newValue}件に設定しました`:`${name} さんの予約上限を無制限に戻しました`);
   await loadCustomers();
 }
+// ★ 予約ルール（booking_rules）の読み込み・保存
+async function loadBookingRulesForm(){
+  if(!sbClient)return;
+  const st=document.getElementById('rule-status');
+  const{data,error}=await sbClient.from('booking_rules').select('*').eq('id',1).limit(1);
+  if(error){if(st){st.style.color='#e74c3c';st.textContent='読み込みに失敗しました（SQLの実行が済んでいるか確認してください）';}return;}
+  const r=(data&&data[0])||null;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=(v==null?'':v);};
+  set('rule-light',r?.light_limit);set('rule-regular',r?.regular_limit);set('rule-premium',r?.premium_limit);
+  set('rule-start',r?.start_date);set('rule-release',r?r.release_hours:3);
+  if(st){st.style.color='#06C755';st.textContent=r?'':'（まだ設定がありません。保存すると有効になります）';}
+}
+async function saveBookingRules(){
+  if(!sbClient)return;
+  const st=document.getElementById('rule-status');
+  const num=(id)=>{const v=document.getElementById(id).value.trim();if(v==='')return {ok:true,v:null};const n=parseInt(v);return (isNaN(n)||n<1)?{ok:false}:{ok:true,v:n};};
+  const l=num('rule-light'),g=num('rule-regular'),p=num('rule-premium');
+  if(!l.ok||!g.ok||!p.ok){showToast('上限は1以上の数字か空欄で入力してください');return;}
+  const start=document.getElementById('rule-start').value;
+  if(!start){showToast('適用開始日を入力してください');return;}
+  const relRaw=document.getElementById('rule-release').value.trim();
+  const rel=relRaw===''?3:parseFloat(relRaw);
+  if(isNaN(rel)||rel<0){showToast('解放の時間は0以上の数字で入力してください');return;}
+  const{data,error}=await sbClient.from('booking_rules').upsert({id:1,light_limit:l.v,regular_limit:g.v,premium_limit:p.v,start_date:start,release_hours:rel}).select();
+  if(error||!data||!data.length){
+    if(st){st.style.color='#e74c3c';st.textContent='保存できませんでした（ログイン状態とSQLの実行を確認してください）';}
+    showToast('保存に失敗しました');return;
+  }
+  if(st){st.style.color='#06C755';st.textContent='保存しました';}
+  showToast('予約ルールを保存しました');
+}
+// ★ 特定スタッフ枠の月間上限（設定した会員のみ。プランとは別の制限）
+async function editStaffLimit(id,name){
+  await ensureStaffLoaded();
+  const c=allClients.find(x=>x.id===id)||{};
+  const staffs=allStaff.filter(s=>s.is_active).map(s=>s.nickname||s.name);
+  if(!staffs.length){showToast('有効なスタッフが登録されていません');return;}
+  const list=staffs.map((s,i)=>`${i+1}: ${s}`).join('\n');
+  const curIdx=c.staff_limit_name?staffs.indexOf(c.staff_limit_name)+1:0;
+  const a=prompt(`${name} さんの「予約回数を制限するスタッフ」の番号を入力してください。\n空欄にすると制限を解除します。\n\n${list}`, curIdx>0?String(curIdx):'');
+  if(a===null)return;
+  let newName=null,newMonthly=null;
+  if(a.trim()!==''){
+    const idx=parseInt(a)-1;
+    if(isNaN(idx)||idx<0||idx>=staffs.length){showToast('番号が正しくありません');return;}
+    newName=staffs[idx];
+    const b=prompt(`${name} さんが「${newName}」の枠を予約できる回数を、月に何回までにしますか？\n（0なら予約できません。適用開始日以降の予約分から数えます）`, c.staff_limit_monthly==null?'':String(c.staff_limit_monthly));
+    if(b===null)return;
+    const n=parseInt(b);
+    if(b.trim()===''||isNaN(n)||n<0){showToast('0以上の数字を入力してください');return;}
+    newMonthly=n;
+  }
+  const{data,error}=await sbClient.from('customers').update({staff_limit_name:newName,staff_limit_monthly:newMonthly}).eq('id',id).select('id');
+  if(error||!data||!data.length){showToast('更新に失敗しました（SQLの実行を確認してください）');return;}
+  showToast(newName?`${name} さんの「${newName}」枠を月${newMonthly}回までに設定しました`:`${name} さんのスタッフ枠の制限を解除しました`);
+  await loadCustomers();
+}
 /* ===================== スタッフ管理 ===================== */
 async function loadStaffManage(){
   if(!sbClient)return;
@@ -1467,13 +1535,13 @@ function initSessionReportsPage(){
   loadSessionReportSummary();
 }
 let lastSessionReportSummary=null;
-async function loadSessionReportSummary(keepExpanded){
+async function loadSessionReportSummary(){
   if(!sbClient)return;
   const month=document.getElementById('report-month').value;
   if(!month){showToast('対象月を選択してください');return;}
   const el=document.getElementById('session-report-summary');
   el.innerHTML='<div class="loading">集計中...</div>';
-  if(keepExpanded!==true)expandedReportDates=new Set();
+  expandedReportDates=new Set();
   const [y,m]=month.split('-').map(Number);
   const startDate=`${month}-01`;
   const endDate=new Date(Date.UTC(y,m,0)).toISOString().slice(0,10);
@@ -1542,7 +1610,7 @@ function renderSessionReportDetail(){
             <td>${timeStr}</td>
             <td>${staffName}</td>
             <td><select class="form-input" style="font-size:12px;padding:4px 6px;" onchange="updateReportCategory('${r.id}',this.value)">${catOptions}</select></td>
-            <td style="white-space:nowrap;"><button class="btn btn-sm" onclick="openSessionReportModal('${r.id}')">編集</button> <button class="btn btn-sm btn-danger" onclick="deleteReportEntry('${r.id}')">削除</button></td>
+            <td><button class="btn btn-sm btn-danger" onclick="deleteReportEntry('${r.id}')">削除</button></td>
           </tr>`;
         }).join('')}
         </tbody></table>
@@ -1565,67 +1633,17 @@ function toggleAllReportDates(){
 async function updateReportCategory(id,category){
   const{data,error}=await sbClient.from('session_reports').update({category:parseInt(category)}).eq('id',id).select();
   if(error){showToast('更新に失敗しました: '+error.message);return;}
-  if(!data||!data.length){showToast('更新できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');await loadSessionReportSummary(true);return;}
+  if(!data||!data.length){showToast('更新できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');await loadSessionReportSummary();return;}
   showToast('修正しました');
-  await loadSessionReportSummary(true);
-}
-async function openSessionReportModal(id){
-  await ensureStaffLoaded();
-  const rec=id?lastSessionReportRaw.find(r=>r.id===id):null;
-  if(id&&!rec){showToast('対象の申請が見つかりません。集計し直してください');return;}
-  document.getElementById('session-report-modal-title').textContent=rec?'申請を編集':'申請を追加（付け忘れ分など）';
-  document.getElementById('sr-edit-id').value=rec?rec.id:'';
-  const today=new Date();
-  document.getElementById('sr-date').value=rec?rec.report_date:toLocalDateStr(today);
-  const timeSel=document.getElementById('sr-time');
-  let opts='';
-  for(let h=7;h<=22;h++){const hh=String(h).padStart(2,'0');opts+=`<option value="${hh}:00">${hh}時</option>`;}
-  timeSel.innerHTML=opts;
-  if(rec&&rec.session_time){
-    const t=new Date(rec.session_time).toTimeString().slice(0,5);
-    if(![...timeSel.options].some(o=>o.value===t))timeSel.insertAdjacentHTML('beforeend',`<option value="${t}">${t}</option>`);
-    timeSel.value=t;
-  }
-  const staffSel=document.getElementById('sr-staff');
-  const list=[...allStaff].filter(s=>s.is_active||(rec&&s.id===rec.staff_id)).sort((a,b)=>a.name.localeCompare(b.name,'ja'));
-  staffSel.innerHTML='<option value="">選択してください</option>'+list.map(s=>`<option value="${s.id}">${s.name}${s.is_active?'':'（停止中）'}</option>`).join('');
-  staffSel.value=rec?rec.staff_id:'';
-  document.getElementById('sr-category').value=rec?String(rec.category):'1';
-  openModal('modal-session-report');
-}
-async function saveSessionReportModal(){
-  const id=document.getElementById('sr-edit-id').value;
-  const date=document.getElementById('sr-date').value;
-  const time=document.getElementById('sr-time').value;
-  const staffId=document.getElementById('sr-staff').value;
-  const category=parseInt(document.getElementById('sr-category').value);
-  if(!date||!time||!staffId){showToast('日付・時間・スタッフを選択してください');return;}
-  const sessionTime=new Date(`${date}T${time}:00`).toISOString();
-  let res;
-  if(id){
-    res=await sbClient.from('session_reports').update({report_date:date,session_time:sessionTime,staff_id:staffId,category}).eq('id',id).select();
-  }else{
-    res=await sbClient.from('session_reports').insert({staff_id:staffId,report_date:date,session_time:sessionTime,category,report_mode:'admin',booking_ids:[]}).select();
-  }
-  const{data,error}=res;
-  if(error){
-    showToast(error.code==='23505'?'同じスタッフ・同じ時間の申請が既にあります。その申請を編集してください':'保存に失敗しました: '+error.message);
-    return;
-  }
-  if(!data||!data.length){showToast('保存できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');return;}
-  closeModal('modal-session-report');
-  showToast(id?'修正しました':'追加しました');
-  document.getElementById('report-month').value=date.slice(0,7);
-  expandedReportDates.add(date);
-  await loadSessionReportSummary(true);
+  await loadSessionReportSummary();
 }
 async function deleteReportEntry(id){
   if(!confirm('この申請を削除しますか？'))return;
   const{data,error}=await sbClient.from('session_reports').delete().eq('id',id).select();
   if(error){showToast('削除に失敗しました: '+error.message);return;}
-  if(!data||!data.length){showToast('削除できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');await loadSessionReportSummary(true);return;}
+  if(!data||!data.length){showToast('削除できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');await loadSessionReportSummary();return;}
   showToast('削除しました');
-  await loadSessionReportSummary(true);
+  await loadSessionReportSummary();
 }
 function exportSessionReportCSV(){
   if(!lastSessionReportSummary){showToast('先に集計してください');return;}
