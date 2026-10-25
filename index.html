@@ -74,6 +74,9 @@
     .time-slot { padding: 10px 18px; border-radius: 99px; border: 1.5px solid #e0e0e0; font-size: 15px; color: #333; cursor: pointer; transition: all 0.15s; }
     .time-slot.selected { background: #06C755; border-color: #06C755; color: white; font-weight: 600; }
     .time-slot.full { background: #f5f5f5; color: #ccc; border-color: #eee; cursor: default; text-decoration: line-through; }
+    .time-slot.limited { background: #f5f5f5; color: #aaa; border-color: #e6e6e6; cursor: default; }
+    .time-slot.limited .limited-tag { font-size: 10px; margin-left: 4px; color: #b08a00; }
+    .time-notice { margin-top: 10px; font-size: 12px; line-height: 1.7; color: #8a6000; background: #fff8e6; border-radius: 8px; padding: 8px 12px; }
     .confirm-card { background: white; margin: 12px; border-radius: 14px; overflow: hidden; }
     .confirm-card-title { padding: 14px 16px 0; font-size: 14px; font-weight: 600; }
     .confirm-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 16px; border-bottom: 1px solid #f5f5f5; }
@@ -171,6 +174,7 @@
   <div class="time-section" id="time-section" style="display:none;">
     <div class="time-title" id="time-section-title"></div>
     <div class="time-slots" id="time-slots"></div>
+    <div id="time-slots-notice"></div>
   </div>
   <div class="viewonly-banner" id="cal-viewonly-msg" style="display:none;">
     <strong>📋 空き状況の確認のみ可能です</strong>
@@ -254,6 +258,82 @@ function bookingDeadlineText(menu){
   if(m <= 0) return '開始直前';
   return m % 60 === 0 ? `${m/60}時間前` : `${m}分前`;
 }
+// ===== 予約ルール（プラン別の同時保持上限 / 特定スタッフ枠の月間上限 / 直前の空き解放） =====
+// 最終的な判定はDB側(create_booking_checked)で行う。ここは「事前にグレー表示・案内する」ための同じ判定。
+// ルールが読み込めない場合(bookingRules=null)は、個別上限(customers.concurrent_booking_limit)だけを従来どおり判定する。
+let bookingRules = null;      // booking_rules テーブルの1行（未作成・取得失敗なら null）
+let lastStaffPerSlot = {};    // 直近に表示した日の「時間帯 → 担当スタッフ」
+const JST_OFFSET_MS = 9 * 3600 * 1000;
+function jstDateStr(ms){ return new Date(ms + JST_OFFSET_MS).toISOString().slice(0,10); }
+function jstMonthRange(ms){
+  const d = new Date(ms + JST_OFFSET_MS), y = d.getUTCFullYear(), m = d.getUTCMonth();
+  return [Date.UTC(y, m, 1) - JST_OFFSET_MS, Date.UTC(y, m + 1, 1) - JST_OFFSET_MS];
+}
+// 戻り値：制限なし→null / 制限あり→{reason:'concurrent_limit'|'staff_limit', ...}
+function computeBookingRestriction(o){
+  const rules = o.rules, customer = o.customer;
+  if(!o.isSemi) return null; // 自主トレ・体験（チケットを使わない予約）は対象外
+  const slotStaff = Array.isArray(o.slotStaff) ? o.slotStaff : [];
+  const releaseMs = rules ? (Number(rules.release_hours) || 0) * 3600000 : 0;
+  // 開始の release_hours 時間前以内の枠は、空いていれば制限なしで予約できる
+  if(rules && o.slotStartMs - releaseMs <= o.nowMs) return null;
+  const targetDate = jstDateStr(o.slotStartMs);
+  const startMs = rules && rules.start_date ? Date.parse(rules.start_date + 'T00:00:00+09:00') : 0;
+  const held = (o.bookings || []).filter(b => b.status === 'confirmed' && Number(b.menus && b.menus.ticket_cost) > 0);
+  // A) 同時に保持できる予約数（個別設定を優先、なければプラン別の標準値）
+  let limit = null, from = o.nowMs, source = null;
+  const indiv = Number(customer && customer.concurrent_booking_limit) || 0;
+  if(indiv > 0){ limit = indiv; source = 'individual'; }
+  else if(rules && targetDate >= rules.start_date){
+    const map = { '4': rules.light_limit, '8': rules.regular_limit, 'unlimited': rules.premium_limit };
+    const v = map[o.planType];
+    if(v != null && Number(v) > 0){ limit = Number(v); source = 'plan'; from = Math.max(o.nowMs, startMs); }
+  }
+  if(limit){
+    const heldCount = held.filter(b => Date.parse(b.scheduled_at) >= from).length;
+    if(heldCount >= limit) return { reason: 'concurrent_limit', limit: limit, held: heldCount, source: source };
+  }
+  // B) 特定スタッフ枠の月間上限（設定した会員のみ）
+  const nm = customer && customer.staff_limit_name, mo = customer && customer.staff_limit_monthly;
+  if(rules && nm && mo != null && Number(mo) >= 0 && targetDate >= rules.start_date && slotStaff.indexOf(nm) !== -1){
+    const rng = jstMonthRange(o.slotStartMs);
+    const used = (o.bookings || []).filter(b =>
+      (b.status === 'confirmed' || b.status === 'completed') && Number(b.menus && b.menus.ticket_cost) > 0 &&
+      Array.isArray(b.slot_staff) && b.slot_staff.indexOf(nm) !== -1 &&
+      Date.parse(b.scheduled_at) >= rng[0] && Date.parse(b.scheduled_at) < rng[1]).length;
+    if(used >= Number(mo)) return { reason: 'staff_limit', monthly: Number(mo), used: used };
+  }
+  return null;
+}
+// 選択中の時間帯の担当スタッフ（配列。担当表示がなければ空配列）
+function staffForSelectedSlot(){
+  const v = lastStaffPerSlot ? lastStaffPerSlot[selectedTime] : null;
+  return Array.isArray(v) ? v : (v ? [v] : []);
+}
+function restrictionMessage(r){
+  const h = bookingRules ? Number(bookingRules.release_hours) : 0;
+  const rel = h > 0 ? `\n※開始${h}時間前以内に空きがある枠は、どなたでもご予約いただけます。` : '';
+  if(r.reason === 'staff_limit') return `この枠は人気のため、ご予約回数を制限しております。${rel}`;
+  return `現在のご予約が上限（${r.limit}件）に達しているため、新しいご予約はお取りできません。\n予約済みのセッションをご利用いただくか、キャンセルされると、次のご予約が可能になります。${rel}`;
+}
+// 会員の予約（グレー表示・事前チェック用）。取得できなかった場合は null（＝事前の制限はせず、DB側の判定に任せる）
+async function loadMemberBookingsForRules(){
+  try{
+    const since = new Date(Date.now() - 40 * 86400000).toISOString();
+    const cols = bookingRules ? 'scheduled_at,status,slot_staff,menus!inner(ticket_cost)' : 'scheduled_at,status,menus!inner(ticket_cost)';
+    const { data, error } = await sbClient.from('bookings').select(cols)
+      .eq('customer_id', currentCustomer.id).in('status', ['confirmed', 'completed'])
+      .gte('scheduled_at', since).gt('menus.ticket_cost', 0).limit(1000);
+    if(error) return null;
+    return data || [];
+  }catch(e){ return null; }
+}
+async function loadBookingRules(){
+  try{
+    const { data, error } = await sbClient.from('booking_rules').select('*').eq('id', 1).limit(1);
+    bookingRules = (!error && data && data.length) ? data[0] : null;
+  }catch(e){ bookingRules = null; }
+}
 let selectedDate = null;
 let selectedTime = null;
 let calYear, calMonth;
@@ -281,6 +361,7 @@ async function init() {
   }
   const { data: menus } = await sbClient.from('menus').select('*').eq('is_active', true).order('sort_order');
   allMenus = menus || [];
+  await loadBookingRules();
   await loadCustomer();
   const params = new URLSearchParams(location.search);
   const screen = params.get('screen');
@@ -509,6 +590,7 @@ async function selectDate(ds){
   await renderTimeSlots(ds);
 }
 async function renderTimeSlots(ds) {
+  { const nEl = document.getElementById('time-slots-notice'); if(nEl) nEl.innerHTML = ''; }
   const { data: slotSetting } = await sbClient.from('slot_settings').select('*').eq('date', ds).single();
   const dow = new Date(ds).getDay();
   const { data: weeklySetting } = await sbClient.from('weekly_slot_settings').select('*').eq('day_of_week', dow).single();
@@ -566,6 +648,13 @@ async function renderTimeSlots(ds) {
   const nowForFilter = new Date(Date.now() + bookingLeadMinutes(selectedMenu) * 60000);
   const activeSlots = baseSlots.filter(s => !blockedSlots.includes(s) && new Date(ds+'T'+s+':00') > nowForFilter);
   let html = '';
+  // ★ 予約ルール（同時保持上限・特定スタッフ枠の月間上限）による制限をグレー表示にする。
+  //    取得に失敗した場合は何も制限せず、確定時のDB判定に任せる（会員を締め出さない）
+  lastStaffPerSlot = staffPerSlot;
+  const memberBookingsForRules = isSemiMenu ? await loadMemberBookingsForRules() : null;
+  const planTypeForRules = (getTicketForDate(ds) || {}).plan_type;
+  let limitedConcurrent = null, limitedStaff = false;
+  document.getElementById('time-slots-notice').innerHTML = '';
   for(const slot of activeSlots){
     const [h] = slot.split(':');
     const slotBookings = (existingBookings||[]).filter(b=>{
@@ -575,16 +664,19 @@ async function renderTimeSlots(ds) {
     const personalCount = slotBookings.filter(b=>b.menus?.max_per_slot===1).length;
     const semiCount = slotBookings.filter(b=>b.menus?.ticket_cost>0 && b.menus?.max_per_slot!==1).length;
     const jiCount = slotBookings.filter(b=>b.menus?.ticket_cost===0&&b.menus?.max_per_slot>1).length;
-    const slotTaikenMax = taikenMaxPerSlot[slot] || 0; // ★ この枠の体験定員（0=体験枠なし）
+    const slotTaikenMax = taikenMaxPerSlot[slot] || 0; // ★ この枠の体験定員（0=従来どおり／1以上=体験枠あり／-1=体験を受け付けない）
     let isFull = false;
     const slotSemiMax = semiMaxPerSlot[slot] || 2;
     if(isSemiMenu){
       // ★ 体験枠あり時間帯：セミパーソナルは体験の有無に関わらず予約可能
-      if(personalCount > 0 && slotTaikenMax === 0) isFull = true; // 体験枠なし時のみブロック
+      if(personalCount > 0 && slotTaikenMax <= 0) isFull = true; // 体験枠なし時のみブロック
       if(semiCount >= slotSemiMax) isFull = true;
     } else if(isPersonalMenu){
-      // ★ 体験枠あり時間帯：体験を1枠まで受付
-      if(slotTaikenMax > 0){
+      // ★ 体験を受け付けない設定（-1）の時間帯は、セミの予約がなくても体験不可
+      if(slotTaikenMax < 0){
+        isFull = true;
+      } else if(slotTaikenMax > 0){
+        // ★ 体験枠あり時間帯：体験を1枠まで受付
         if(personalCount >= slotTaikenMax) isFull = true; // 体験定員に達したらブロック
       } else {
         if(semiCount > 0) isFull = true; // 体験枠なし時はセミがいたらブロック
@@ -613,11 +705,31 @@ async function renderTimeSlots(ds) {
     const staffBadge = staffAtSlot.length
       ? `<span style="font-size:9px;background:#fff3cd;color:#8a6000;padding:1px 5px;border-radius:99px;font-weight:700;margin-left:4px;vertical-align:middle;">${staffAtSlot.join('・')}</span>`
       : '';
+    let restriction = null;
+    if(!isFull && memberBookingsForRules){
+      try{
+        restriction = computeBookingRestriction({
+          rules: bookingRules, customer: currentCustomer, planType: planTypeForRules,
+          bookings: memberBookingsForRules, isSemi: isSemiMenu,
+          slotStartMs: new Date(ds+'T'+slot+':00').getTime(), nowMs: Date.now(), slotStaff: staffAtSlot
+        });
+      }catch(e){ restriction = null; }
+    }
     if(isFull) html+=`<div class="time-slot full">${slot}${trioBadge}${staffBadge}</div>`;
+    else if(restriction){
+      if(restriction.reason === 'staff_limit') limitedStaff = true; else limitedConcurrent = restriction;
+      html+=`<div class="time-slot limited">${slot}${trioBadge}${staffBadge}<span class="limited-tag">制限中</span></div>`;
+    }
     else html+=`<div class="time-slot${isSel?' selected':''}" onclick="selectTime('${slot}')">${slot}${remainLabel}${trioBadge}${staffBadge}</div>`;
   }
   if(activeSlots.length === 0){
     html = '<div style="color:#aaa;font-size:13px;">この日は予約できる時間帯がありません</div>';
+  }
+  {
+    const notices = [];
+    if(limitedConcurrent) notices.push(restrictionMessage(limitedConcurrent).replace(/\n/g,'<br>'));
+    if(limitedStaff) notices.push(restrictionMessage({reason:'staff_limit'}).replace(/\n/g,'<br>'));
+    document.getElementById('time-slots-notice').innerHTML = notices.map(n=>`<div class="time-notice">${n}</div>`).join('');
   }
   document.getElementById('time-slots').innerHTML=html;
   document.getElementById('time-section').style.display='block';
@@ -626,7 +738,7 @@ async function renderTimeSlots(ds) {
 }
 function selectTime(t){
   selectedTime=t;
-  document.querySelectorAll('.time-slot:not(.full)').forEach(el=>{
+  document.querySelectorAll('.time-slot:not(.full):not(.limited)').forEach(el=>{
     el.classList.toggle('selected', el.textContent.trim().startsWith(t));
   });
   if(isViewOnlyMode){
@@ -663,19 +775,23 @@ function renderConfirm(){
 //      {status:'fallback', cause}               … 関数の不具合・通信エラーなど（会員を締め出さないため従来方式で続行する）
 async function tryCreateBookingChecked(client, p){
   try{
-    const { data, error } = await client.rpc('create_booking_checked', {
+    const args = {
       p_customer_id: p.customerId,
       p_ticket_id: p.ticketId,
       p_menu_id: p.menuId,
       p_menu_name: p.menuName,
       p_scheduled_at: p.scheduledAt,
       p_duration_minutes: p.durationMinutes
-    });
+    };
+    // 予約ルール用のテーブル(booking_rules)が使える環境(＝SQL適用済み)のときだけ、担当スタッフも渡す。
+    // 未適用の環境で新しい引数を渡すと関数が見つからず従来方式に落ちてしまうため。
+    if(bookingRules) args.p_slot_staff = Array.isArray(p.slotStaff) && p.slotStaff.length ? p.slotStaff : null;
+    const { data, error } = await client.rpc('create_booking_checked', args);
     if(error || !data || typeof data !== 'object') return { status:'fallback', cause: error || 'empty-response' };
     if(data.ok === true && data.booking_id){
       return { status:'ok', bookingId: data.booking_id, remaining: (data.remaining_count ?? null) };
     }
-    if(data.ok === false && (data.reason === 'limit_reached' || data.reason === 'no_balance' || data.reason === 'no_ticket')){
+    if(data.ok === false && (data.reason === 'limit_reached' || data.reason === 'no_balance' || data.reason === 'no_ticket' || data.reason === 'concurrent_limit' || data.reason === 'staff_limit')){
       return { status:'rejected', reason: data.reason, detail: data };
     }
     return { status:'fallback', cause: data };
@@ -684,6 +800,9 @@ async function tryCreateBookingChecked(client, p){
   }
 }
 function bookingRejectMessage(reason, detail){
+  if(reason === 'concurrent_limit' || reason === 'staff_limit'){
+    return restrictionMessage(Object.assign({}, detail || {}, { reason: reason }));
+  }
   if(reason === 'limit_reached'){
     return `ご契約回数（${detail?.total_count ?? ''}回）分の予約がすでに入っているため、これ以上予約できません。\nご予約の変更をご希望の場合は、既存の予約をキャンセルしてからお願いします。`;
   }
@@ -755,22 +874,27 @@ async function submitBookingInner(){
         return;
       }
     }
-    // ★ プランごとの同時保持予約数の上限チェック（管理画面「設定」で設定）。
-    //    予約日時を過ぎた予約は自動的に「消化済み」扱いとしてカウントから外す（＝今から見て未来の確定予約のみ数える）
-    // ★ 個別設定（customers.concurrent_booking_limit）が入っている会員のみ上限チェックを行う（プラン既定値は今回使わない）
-    const concurrentLimit = currentCustomer?.concurrent_booking_limit || null;
-    if(concurrentLimit){
-      const nowISO = new Date().toISOString();
-      const { count: heldCount } = await sbClient.from('bookings')
-        .select('id, menus!inner(ticket_cost)', { count: 'exact', head: true })
-        .eq('customer_id', currentCustomer.id)
-        .eq('status', 'confirmed')
-        .gte('scheduled_at', nowISO)
-        .gt('menus.ticket_cost', 0);
-      if((heldCount||0) >= concurrentLimit){
-        btn.disabled=false; btn.textContent='この日時で予約を確定する';
-        alert(`現在保持できる予約件数の上限（${concurrentLimit}件）に達しています。\n既存の予約の日時が過ぎるか、キャンセルされると、新しい予約ができるようになります。`);
-        return;
+    // ★ 予約ルールの事前チェック（同時保持上限・特定スタッフ枠の月間上限。直前の空きは解放）。
+    //    画面のグレー表示と同じ判定。最終判定はDB側(create_booking_checked)でも行う。
+    //    予約を取得できなかった場合は事前チェックを飛ばし、DB側の判定に任せる。
+    {
+      const [rh, rm] = selectedTime.split(':');
+      const rStart = new Date(selectedDate); rStart.setHours(parseInt(rh), parseInt(rm), 0, 0);
+      const rBookings = await loadMemberBookingsForRules();
+      if(rBookings){
+        let restriction = null;
+        try{
+          restriction = computeBookingRestriction({
+            rules: bookingRules, customer: currentCustomer, planType: bookingTicket.plan_type,
+            bookings: rBookings, isSemi: true, slotStartMs: rStart.getTime(), nowMs: Date.now(),
+            slotStaff: staffForSelectedSlot()
+          });
+        }catch(e){ restriction = null; }
+        if(restriction){
+          btn.disabled=false; btn.textContent='この日時で予約を確定する';
+          alert(restrictionMessage(restriction));
+          return;
+        }
       }
     }
   }
@@ -840,6 +964,13 @@ async function submitBookingInner(){
     const { data: taikenWeeklyCfg } = await sbClient.from('weekly_slot_settings').select('taiken_max_per_slot').eq('day_of_week', new Date(selectedDate).getDay()).single();
     const slotTaikenMaxSubmit = taikenSlotCfg?.taiken_max_per_slot?.[selectedTime] || taikenWeeklyCfg?.taiken_max_per_slot?.[selectedTime] || 0;
     if (isPersonalMenu) {
+      if(slotTaikenMaxSubmit < 0){
+        // 体験を受け付けない設定の時間帯（画面を開いたまま設定が変わった場合などの保険）
+        btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
+        alert('申し訳ございません。この時間帯は体験の受付をしておりません。\n別の時間をお選びください。');
+        goScreen('screen-calendar');
+        return;
+      }
       if(slotTaikenMaxSubmit > 0){
         // 体験枠あり：体験定員チェック
         if(personalCount >= slotTaikenMaxSubmit){
@@ -856,7 +987,7 @@ async function submitBookingInner(){
         }
       }
     }
-    if (isSemiMenu && personalCount > 0 && slotTaikenMaxSubmit === 0) {
+    if (isSemiMenu && personalCount > 0 && slotTaikenMaxSubmit <= 0) {
       btn.disabled = false; btn.textContent = 'この日時で予約を確定する';
       alert('申し訳ございません。この時間帯は体験予約のため埋まっております。\n別の時間をお選びください。');
       return;
@@ -892,7 +1023,8 @@ async function submitBookingInner(){
     menuId: selectedMenu.id,
     menuName: selectedMenu.name,
     scheduledAt: dt.toISOString(),
-    durationMinutes: selectedMenu.duration_minutes
+    durationMinutes: selectedMenu.duration_minutes,
+    slotStaff: staffForSelectedSlot()
   });
   if(created.status === 'ok'){
     newBookingId = created.bookingId;
