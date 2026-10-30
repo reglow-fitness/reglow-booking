@@ -336,8 +336,11 @@
         <div id="session-report-summary"><div class="loading">対象月を選んで「集計する」を押してください</div></div>
       </div>
       <div class="card">
-        <strong style="font-size:14px;display:block;margin-bottom:4px;">個別の申請一覧（訂正・削除）</strong>
-        <p style="font-size:12px;color:#888;margin-bottom:14px;">スタッフの入力ミスなどをここから直接修正・削除できます（管理者ログイン中は日付に関わらず操作できます）。</p>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+          <strong style="font-size:14px;">個別の申請一覧（追加・訂正・削除）</strong>
+          <button class="btn btn-primary btn-sm" onclick="openSessionReportModal()">＋ 申請を追加</button>
+        </div>
+        <p style="font-size:12px;color:#888;margin-bottom:14px;">スタッフの付け忘れ分の追加や、日付・時間・スタッフ・人数の書き換えがここからできます。管理画面にログインしている時だけ操作でき、スタッフ側からは過去分は触れません。</p>
         <div id="session-report-detail"><div class="loading">対象月を選んで「集計する」を押してください</div></div>
       </div>
     </div>
@@ -553,6 +556,17 @@
     <div class="form-row"><label class="form-label">時間（分）</label><select class="form-input" id="booking-duration"><option value="60">60分</option><option value="90">90分</option><option value="120">120分</option></select></div>
     <div class="form-row"><label class="form-label">担当スタッフ（内部管理用・会員には非表示）</label><select class="form-input" id="booking-staff-id"><option value="">未設定</option></select></div>
     <div class="modal-footer"><button class="btn" onclick="closeModal('modal-add-booking')">キャンセル</button><button class="btn btn-primary" onclick="addBooking()">予約を追加</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-session-report" onclick="closeModalOutside(event,'modal-session-report')">
+  <div class="modal">
+    <div class="modal-title" id="session-report-modal-title">申請を追加</div>
+    <input type="hidden" id="sr-edit-id">
+    <div class="form-row"><label class="form-label">日付 *</label><input type="date" class="form-input" id="sr-date"></div>
+    <div class="form-row"><label class="form-label">時間 *</label><select class="form-input" id="sr-time"></select></div>
+    <div class="form-row"><label class="form-label">スタッフ *</label><select class="form-input" id="sr-staff"></select></div>
+    <div class="form-row"><label class="form-label">対応人数 *</label><select class="form-input" id="sr-category"><option value="1">1人対応</option><option value="2">2人対応</option><option value="3">3人対応</option><option value="0">なし</option></select></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-session-report')">キャンセル</button><button class="btn btn-primary" onclick="saveSessionReportModal()">保存する</button></div>
   </div>
 </div>
 <div class="modal-overlay" id="modal-edit-name" onclick="closeModalOutside(event,'modal-edit-name')">
@@ -1539,13 +1553,13 @@ function initSessionReportsPage(){
   loadSessionReportSummary();
 }
 let lastSessionReportSummary=null;
-async function loadSessionReportSummary(){
+async function loadSessionReportSummary(keepExpanded){
   if(!sbClient)return;
   const month=document.getElementById('report-month').value;
   if(!month){showToast('対象月を選択してください');return;}
   const el=document.getElementById('session-report-summary');
   el.innerHTML='<div class="loading">集計中...</div>';
-  expandedReportDates=new Set();
+  if(keepExpanded!==true)expandedReportDates=new Set();
   const [y,m]=month.split('-').map(Number);
   const startDate=`${month}-01`;
   const endDate=new Date(Date.UTC(y,m,0)).toISOString().slice(0,10);
@@ -1614,7 +1628,7 @@ function renderSessionReportDetail(){
             <td>${timeStr}</td>
             <td>${staffName}</td>
             <td><select class="form-input" style="font-size:12px;padding:4px 6px;" onchange="updateReportCategory('${r.id}',this.value)">${catOptions}</select></td>
-            <td><button class="btn btn-sm btn-danger" onclick="deleteReportEntry('${r.id}')">削除</button></td>
+            <td style="white-space:nowrap;"><button class="btn btn-sm" onclick="openSessionReportModal('${r.id}')">編集</button> <button class="btn btn-sm btn-danger" onclick="deleteReportEntry('${r.id}')">削除</button></td>
           </tr>`;
         }).join('')}
         </tbody></table>
@@ -1637,17 +1651,66 @@ function toggleAllReportDates(){
 async function updateReportCategory(id,category){
   const{data,error}=await sbClient.from('session_reports').update({category:parseInt(category)}).eq('id',id).select();
   if(error){showToast('更新に失敗しました: '+error.message);return;}
-  if(!data||!data.length){showToast('更新できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');await loadSessionReportSummary();return;}
+  if(!data||!data.length){showToast('更新できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');await loadSessionReportSummary(true);return;}
   showToast('修正しました');
-  await loadSessionReportSummary();
+  await loadSessionReportSummary(true);
+}
+async function openSessionReportModal(id){
+  await ensureStaffLoaded();
+  const rec=id?lastSessionReportRaw.find(r=>r.id===id):null;
+  if(id&&!rec){showToast('対象の申請が見つかりません。集計し直してください');return;}
+  document.getElementById('session-report-modal-title').textContent=rec?'申請を編集':'申請を追加（付け忘れ分など）';
+  document.getElementById('sr-edit-id').value=rec?rec.id:'';
+  document.getElementById('sr-date').value=rec?rec.report_date:toLocalDateStr(new Date());
+  const timeSel=document.getElementById('sr-time');
+  let opts='';
+  for(let h=7;h<=22;h++){const hh=String(h).padStart(2,'0');opts+=`<option value="${hh}:00">${hh}時</option>`;}
+  timeSel.innerHTML=opts;
+  if(rec&&rec.session_time){
+    const t=new Date(rec.session_time).toTimeString().slice(0,5);
+    if(![...timeSel.options].some(o=>o.value===t))timeSel.insertAdjacentHTML('beforeend',`<option value="${t}">${t}</option>`);
+    timeSel.value=t;
+  }
+  const staffSel=document.getElementById('sr-staff');
+  const list=[...allStaff].filter(s=>s.is_active||(rec&&s.id===rec.staff_id)).sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  staffSel.innerHTML='<option value="">選択してください</option>'+list.map(s=>`<option value="${s.id}">${s.name}${s.is_active?'':'（停止中）'}</option>`).join('');
+  staffSel.value=rec?rec.staff_id:'';
+  document.getElementById('sr-category').value=rec?String(rec.category):'1';
+  openModal('modal-session-report');
+}
+async function saveSessionReportModal(){
+  const id=document.getElementById('sr-edit-id').value;
+  const date=document.getElementById('sr-date').value;
+  const time=document.getElementById('sr-time').value;
+  const staffId=document.getElementById('sr-staff').value;
+  const category=parseInt(document.getElementById('sr-category').value);
+  if(!date||!time||!staffId){showToast('日付・時間・スタッフを選択してください');return;}
+  const sessionTime=new Date(`${date}T${time}:00`).toISOString();
+  let res;
+  if(id){
+    res=await sbClient.from('session_reports').update({report_date:date,session_time:sessionTime,staff_id:staffId,category}).eq('id',id).select();
+  }else{
+    res=await sbClient.from('session_reports').insert({staff_id:staffId,report_date:date,session_time:sessionTime,category,report_mode:'admin',booking_ids:[]}).select();
+  }
+  const{data,error}=res;
+  if(error){
+    showToast(error.code==='23505'?'同じスタッフ・同じ時間の申請が既にあります。その申請を編集してください':'保存に失敗しました: '+error.message);
+    return;
+  }
+  if(!data||!data.length){showToast('保存できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');return;}
+  closeModal('modal-session-report');
+  showToast(id?'修正しました':'追加しました');
+  document.getElementById('report-month').value=date.slice(0,7);
+  expandedReportDates.add(date);
+  await loadSessionReportSummary(true);
 }
 async function deleteReportEntry(id){
   if(!confirm('この申請を削除しますか？'))return;
   const{data,error}=await sbClient.from('session_reports').delete().eq('id',id).select();
   if(error){showToast('削除に失敗しました: '+error.message);return;}
-  if(!data||!data.length){showToast('削除できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');await loadSessionReportSummary();return;}
+  if(!data||!data.length){showToast('削除できませんでした（管理者ログインが必要です。ログイン状態を確認してください）');await loadSessionReportSummary(true);return;}
   showToast('削除しました');
-  await loadSessionReportSummary();
+  await loadSessionReportSummary(true);
 }
 function exportSessionReportCSV(){
   if(!lastSessionReportSummary){showToast('先に集計してください');return;}
