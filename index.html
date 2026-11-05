@@ -527,6 +527,24 @@ async function renderMenuSelect() {
     el.appendChild(div);
   }
 }
+// ★ 体験は1人1回まで。過去に体験の予約（キャンセル以外）がある会員は、再度の体験予約ができない。
+//    取得に失敗したときは止めない（会員を締め出さない）。スタッフが管理画面から予約を追加する場合は制限なし。
+const TAIKEN_ONCE_MESSAGE = '体験のご利用は1回限りとなっております。\nご入会をご検討の際は、スタッフまでお気軽にお問い合わせください。';
+function isTaikenMenu(menu){
+  return !!menu && menu.ticket_cost === 0 && ((menu.name || '').includes('体験') || menu.max_per_slot === 1);
+}
+async function hasUsedTaiken(){
+  try{
+    if(!currentCustomer) return false;
+    const ids = (allMenus || []).filter(isTaikenMenu).map(m => m.id);
+    if(!ids.length) return false;
+    const { data, error } = await sbClient.from('bookings').select('id')
+      .eq('customer_id', currentCustomer.id).in('menu_id', ids)
+      .in('status', ['confirmed', 'completed']).limit(1);
+    if(error) return false;
+    return !!(data && data.length);
+  }catch(e){ return false; }
+}
 function selectMenu(menu, viewOnly = false) {
   selectedMenu = menu;
   selectedDate = null;
@@ -544,6 +562,16 @@ function selectMenu(menu, viewOnly = false) {
     notice.textContent = '1回分のチケットが消化されます。予約確定後のキャンセルは2時間前まで受け付けます。';
   } else {
     notice.style.display = 'none';
+  }
+  // 体験メニューを選んだとき、すでに体験済みなら先に進めないようにする
+  if (isTaikenMenu(menu) && !viewOnly) {
+    hasUsedTaiken().then(used => {
+      if (used && selectedMenu === menu) {
+        notice.style.display = 'block';
+        notice.textContent = TAIKEN_ONCE_MESSAGE.replace('\n', '');
+        document.getElementById('menu-next-btn').style.display = 'none';
+      }
+    });
   }
 }
 function renderCalendar() {
@@ -931,6 +959,11 @@ async function submitBookingInner(){
       !b.menus?.name?.includes('体験') &&
       b.menus?.max_per_slot !== 1
     );
+    if(isTaikenMenu(selectedMenu) && await hasUsedTaiken()){
+      btn.disabled=false;btn.textContent='この日時で予約を確定する';
+      alert(TAIKEN_ONCE_MESSAGE);
+      return;
+    }
     if(isSemiSelected && hasSemiBooked){
       btn.disabled=false;btn.textContent='この日時で予約を確定する';
       alert('セミパーソナルは1日1回のみ予約できます。');
