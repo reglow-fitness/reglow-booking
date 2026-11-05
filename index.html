@@ -536,6 +536,8 @@ function isTaikenMenu(menu){
 async function hasUsedTaiken(){
   try{
     if(!currentCustomer) return false;
+    // 管理画面で「体験の予約を不可」に設定された会員（以前の予約システムで体験済みの方など）
+    if(currentCustomer.taiken_blocked === true) return true;
     const ids = (allMenus || []).filter(isTaikenMenu).map(m => m.id);
     if(!ids.length) return false;
     const { data, error } = await sbClient.from('bookings').select('id')
